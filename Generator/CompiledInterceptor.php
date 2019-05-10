@@ -36,7 +36,7 @@ class CompiledInterceptor extends Interceptor
         } else {
             $this->plugins = [];
             foreach (['primary', 'frontend', 'adminhtml', 'crontab', 'webapi_rest', 'webapi_soap'] as $scope) {
-                $plugins[$scope] = new CompiledPluginList($scope);
+                $this->plugins[$scope] = new CompiledPluginList($scope);
             }
         }
     }
