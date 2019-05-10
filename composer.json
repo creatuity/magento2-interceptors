@@ -1,0 +1,17 @@
+{
+  "name": "creatuity/magento2-interceptors",
+  "description": "Creatuity Compiled Interceptors Module",
+  "version": "1.0.0",
+  "authors": [
+    {
+      "name": "Creatuity Corp",
+      "homepage": "http://creatuity.com/"
+    }
+  ],
+  "autoload": {
+    "files": ["registration.php"],
+    "psr-4": {
+      "Creatuity\\Interception\\": ""
+    }
+  }
+}
