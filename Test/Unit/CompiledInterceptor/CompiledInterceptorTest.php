@@ -9,7 +9,7 @@ namespace Creatuity\Interception\Test\Unit\CompiledInterceptor;
 use Magento\Framework\Code\Generator\Io;
 use Creatuity\Interception\Generator\CompiledInterceptor;
 
-use Creatuity\Interception\Test\Unit\PluginList\CompiledPluginListTest;
+use Creatuity\Interception\Test\Unit\CompiledPluginList\CompiledPluginListTest;
 use \PHPUnit_Framework_MockObject_MockObject as MockObject;
 
 class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
@@ -60,7 +60,6 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
         $interceptor->method('_validateData')->willReturn(true);
 
         $generated = $interceptor->generate();
-
         $this->assertEquals($fileName . '.php', $generated, 'Generated interceptor is invalid.');
     }
 

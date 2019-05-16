@@ -7,7 +7,9 @@
 namespace Creatuity\Interception\Generator;
 
 use Magento\Framework\App\ObjectManager;
+use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Code\Generator\EntityAbstract;
+use Magento\Framework\Config\Scope;
 use Magento\Framework\Interception\Code\Generator\Interceptor;
 use Magento\Framework\Interception\DefinitionInterface;
 
@@ -15,6 +17,9 @@ class CompiledInterceptor extends Interceptor
 {
 
     protected $plugins;
+
+    protected $classMethods = [];
+    protected $classProperties = [];
 
     public function __construct(
         $sourceClassName = null,
@@ -36,19 +41,17 @@ class CompiledInterceptor extends Interceptor
         } else {
             $this->plugins = [];
             foreach (['primary', 'frontend', 'adminhtml', 'crontab', 'webapi_rest', 'webapi_soap'] as $scope) {
-                $this->plugins[$scope] = new CompiledPluginList($scope);
+                $this->plugins[$scope] = new CompiledPluginList(ObjectManager::getInstance(), $scope);
             }
         }
     }
 
+    /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
     public function setInterceptedMethods($interceptedMethods)
     {
-        //DUMMY
-    }
-
-    protected function _getClassProperties()
-    {
-        return [];
+        //NOOP
     }
 
     protected function _generateCode()
@@ -57,41 +60,105 @@ class CompiledInterceptor extends Interceptor
         $reflection = new \ReflectionClass($typeName);
 
         if ($reflection->isInterface()) {
-            $this->_classGenerator->setImplementedInterfaces([$typeName]);
+            return false;
         } else {
             $this->_classGenerator->setExtendedClass($typeName);
         }
 
-        $this->_classGenerator->addUse(ObjectManager::class);
-        $this->_classGenerator->addUse(\Magento\Framework\Config\Scope::class);
+        $this->classMethods = [];
+        $this->classProperties = [];
+        $this->injectPropertiesSettersToConstructor($reflection->getConstructor(), [
+            Scope::class => '____scope',
+            ObjectManagerInterface::class => '____om',
+        ]);
+        $this->overrideMethodsAndGeneratePluginGetters($reflection);
+
         //return parent::_generateCode();
         return EntityAbstract::_generateCode();
     }
 
-    protected function _getClassMethods()
+    protected function overrideMethodsAndGeneratePluginGetters(\ReflectionClass $reflection)
     {
-        $reflectionClass = new \ReflectionClass($this->getSourceClassName());
-        $publicMethods = $reflectionClass->getMethods(\ReflectionMethod::IS_PUBLIC);
+        $publicMethods = $reflection->getMethods(\ReflectionMethod::IS_PUBLIC);
 
-        $methods = [];
         $allPlugins = [];
         foreach ($publicMethods as $method) {
             if ($this->isInterceptedMethod($method)) {
                 $config = $this->_getPluginsConfig($method, $allPlugins);
                 if (!empty($config)) {
-                    $methods[] = $this->_getCompiledMethodInfo($method, $config);
+                    $this->classMethods[] = $this->_getCompiledMethodInfo($method, $config);
                 }
             }
         }
-        if (!empty($methods) && !empty($allPlugins)) {
-            foreach ($allPlugins as $key => $plugins) {
-                foreach ($plugins as $plugin) {
-                    $methods[] = $this->_getPluginGetterInfo($plugin);
+        foreach ($allPlugins as $plugins) {
+            foreach ($plugins as $plugin) {
+                $this->classMethods[] = $this->_getPluginGetterInfo($plugin);
+                $this->classProperties[] = $this->_getPluginPropertyInfo($plugin);
+            }
+        }
+    }
+
+    protected function injectPropertiesSettersToConstructor(\ReflectionMethod $parentConstructor = null, $properties = [])
+    {
+        if ($parentConstructor == null) {
+            $parameters = [];
+            $body = [];
+        } else {
+            $parameters = $parentConstructor->getParameters();
+            foreach ($parameters as $parameter) {
+                $parentCallParams[] = '$' . $parameter->getName();
+            }
+            $body = ["parent::__construct(" . implode(', ', $parentCallParams) .");"];
+        }
+        foreach ($properties as $type => $name) {
+            $this->_classGenerator->addUse($type);
+            $this->classProperties[] = [
+                'name' => $name,
+                'visibility' => 'private',
+                'docblock' => [
+                    'tags' => [['name' => 'var', 'description' => substr(strrchr($type, "\\"), 1)]],
+                ]
+            ];
+        }
+        $extraParams = $properties;
+        $extraSetters = array_combine($properties, $properties);
+        foreach ($parameters as $parameter) {
+            if ($parameter->getType()) {
+                $type = $parameter->getType()->getName();
+                if (isset($properties[$type])) {
+                    $extraSetters[$properties[$type]] = $parameter->getName();
+                    unset($extraParams[$type]);
                 }
             }
+        }
+        $parameters = array_map(array($this, '_getMethodParameterInfo'), $parameters);
+        foreach ($extraParams as $type => $name) {
+            array_unshift($parameters, [
+                'name' => $name,
+                'type' => $type
+            ]);
+        }
+        foreach ($extraSetters as $name => $paramName) {
+            array_unshift($body, "\$this->$name = \$$paramName;");
         }
 
-        return $methods;
+        $this->classMethods[] = [
+            'name' => '__construct',
+            'parameters' => $parameters,
+            'body' => implode("\n", $body),
+            'docblock' => ['shortDescription' => '{@inheritdoc}'],
+        ];
+
+    }
+
+    protected function _getClassMethods()
+    {
+        return $this->classMethods;
+    }
+
+    protected function _getClassProperties()
+    {
+        return $this->classProperties;
     }
 
     private function addCodeSubBlock(&$body, $sub, $indent = 1)
@@ -106,6 +173,8 @@ class CompiledInterceptor extends Interceptor
      * @param $conf
      * @param $parameters
      * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     protected function _getMethodSourceFromConfig(\ReflectionMethod $method, $conf, $parameters, $returnVoid)
     {
@@ -117,8 +186,6 @@ class CompiledInterceptor extends Interceptor
         if (isset($conf[DefinitionInterface::LISTENER_BEFORE])) {
             foreach ($conf[DefinitionInterface::LISTENER_BEFORE] as $plugin) {
                 if ($first) $first = false; else $body[] = "";
-                //$body[] = "/** @var \\" . "{$plugin['class']} \$plugin {$plugin['code']} */";
-                //$body[] = "\$plugin = \$this->" . $this->getGetterName($plugin) . "();";
 
                 $call = "\$this->" . $this->getGetterName($plugin) . "()->before$capName(\$this$extraParams);";
 
@@ -136,11 +203,8 @@ class CompiledInterceptor extends Interceptor
         $main = [];
         if (isset($conf[DefinitionInterface::LISTENER_AROUND])) {
             $plugin = $conf[DefinitionInterface::LISTENER_AROUND];
-            //$body[] = "/** @var \\" . "{$plugin['class']} \$plugin {$plugin['code']} */";
-            //$body[] = "\$plugin = \$this->" . $this->getGetterName($plugin) . "();";
             $main[] = "\$this->" . $this->getGetterName($plugin) . "()->around$capName(\$this, function({$this->_getParameterListForNextCallback($parameters)}){";
             $this->addCodeSubBlock($main, $this->_getMethodSourceFromConfig($method, $plugin['next'] ?: [], $parameters, $returnVoid));
-            //$body[] = "\treturn \$result;";
             $main[] = "}$extraParams);";
         } else {
             $main[] = "parent::{$method->getName()}({$this->_getParameterList($parameters)});";
@@ -149,8 +213,6 @@ class CompiledInterceptor extends Interceptor
 
         if (isset($conf[DefinitionInterface::LISTENER_AFTER])) {
             foreach ($conf[DefinitionInterface::LISTENER_AFTER] as $plugin) {
-                //$body[] = "/** @var \\" . "{$plugin['class']} \$plugin {$plugin['code']} */";
-                //$body[] = "\$plugin = \$this->" . $this->getGetterName($plugin) . "();";
                 if ($returnVoid) {
                     $chain[] = ["((\$tmp = \$this->" . $this->getGetterName($plugin) . "()->after$capName(\$this, \$result$extraParams)) !== null) ? \$tmp : \$result;"];
                 } else {
@@ -159,7 +221,7 @@ class CompiledInterceptor extends Interceptor
             }
         }
         foreach ($chain as $lp => $piece) {
-            //if ($first) $first = false; else $body[] = "";
+            if ($first) $first = false; else $body[] = "";
             if (!$returnVoid) {
                 $piece[0] = (($lp + 1 == count($chain)) ? "return " : "\$result = ") . $piece[0];
             }
@@ -206,16 +268,29 @@ class CompiledInterceptor extends Interceptor
 
     protected function getGetterName($plugin)
     {
-        return '_get_plugin_' . preg_replace("/[^A-Za-z0-9_]/", '_', $plugin['code'] . $plugin['suffix']);
+        return '____plugin_' . $plugin['clean_name'];
+    }
+
+    protected function _getPluginPropertyInfo($plugin)
+    {
+        return [
+            'name' => '____plugin_' . $plugin['clean_name'],
+            'visibility' => 'private',
+            'docblock' => [
+                'tags' => [['name' => 'var', 'description' => '\\' . $plugin['class']]],
+            ]
+        ];
     }
 
     protected function _getPluginGetterInfo($plugin)
     {
         $body = [];
+        $varName = "\$this->____plugin_" . $plugin['clean_name'];
 
-        $body[] = "static \$cache = null;";
-        $body[] = "if (\$cache === null) \$cache = ObjectManager::getInstance()->get(\\" . "{$plugin['class']}::class);";
-        $body[] = "return \$cache;";
+        $body[] = "if ($varName === null) {";
+        $body[] = "\t$varName = \$this->____om->get(\\" . "{$plugin['class']}::class);";
+        $body[] = "}";
+        $body[] = "return $varName;";
 
         return [
             'name' => $this->getGetterName($plugin),
@@ -234,7 +309,7 @@ class CompiledInterceptor extends Interceptor
         $returnsVoid = ($method->hasReturnType() && $method->getReturnType()->getName() == 'void');
 
         $body = [
-            'switch(ObjectManager::getInstance()->get(Scope::class)->getCurrentScope()){'
+            'switch($this->____scope->getCurrentScope()){'
         ];
 
         $cases = [];
@@ -247,7 +322,7 @@ class CompiledInterceptor extends Interceptor
         //call parent method for scopes with no plugins (or when no scope is set)
         $cases[] = ['cases'=>["\tdefault:"], 'conf'=>[]];
 
-        foreach($cases as $case) {
+        foreach ($cases as $case) {
             $body = array_merge($body, $case['cases']);
             $this->addCodeSubBlock($body, $this->_getMethodSourceFromConfig($method, $case['conf'], $parameters, $returnsVoid), 2);
             //$body[] = "\t\tbreak;";
@@ -269,10 +344,11 @@ class CompiledInterceptor extends Interceptor
         $className = $plugins->getPluginType($className, $code);
         if (!isset($allPlugins[$code])) $allPlugins[$code] = [];
         if (empty($allPlugins[$code][$className])) {
+            $suffix = count($allPlugins[$code]) ? count($allPlugins[$code]) + 1 : '';
             $allPlugins[$code][$className] = [
                 'code' => $code,
                 'class' => $className,
-                'suffix' => count($allPlugins[$code]) ? count($allPlugins[$code]) + 1 : ''
+                'clean_name' => preg_replace("/[^A-Za-z0-9_]/", '_', $code . $suffix)
             ];
         }
         $ret = $allPlugins[$code][$className];
