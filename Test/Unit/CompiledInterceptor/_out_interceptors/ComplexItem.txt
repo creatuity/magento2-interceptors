@@ -153,10 +153,25 @@ class Interceptor extends \Creatuity\Interception\Test\Unit\Custom\Module\Model\
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function returnsSelf()
+    {
+        switch($this->____scope->getCurrentScope()){
+        	case 'backend':
+        		$this->____plugin_complex_plugin()->beforeReturnsSelf($this);
+        		
+        		return parent::returnsSelf();
+        	default:
+        		return parent::returnsSelf();
+        }
+    }
+
+    /**
      * plugin "advanced_plugin"
      * @return \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced
      */
-    public function ____plugin_advanced_plugin()
+    public function ____plugin_advanced_plugin() : \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced
     {
         if ($this->____plugin_advanced_plugin === null) {
         	$this->____plugin_advanced_plugin = $this->____om->get(\Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced::class);
@@ -168,7 +183,7 @@ class Interceptor extends \Creatuity\Interception\Test\Unit\Custom\Module\Model\
      * plugin "complex_plugin"
      * @return \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Complex
      */
-    public function ____plugin_complex_plugin()
+    public function ____plugin_complex_plugin() : \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Complex
     {
         if ($this->____plugin_complex_plugin === null) {
         	$this->____plugin_complex_plugin = $this->____om->get(\Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Complex::class);

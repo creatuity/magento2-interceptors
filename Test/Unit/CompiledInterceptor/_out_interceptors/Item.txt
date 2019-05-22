@@ -71,7 +71,7 @@ class Interceptor extends \Creatuity\Interception\Test\Unit\Custom\Module\Model\
      * plugin "simple_plugin"
      * @return \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Simple
      */
-    public function ____plugin_simple_plugin()
+    public function ____plugin_simple_plugin() : \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Simple
     {
         if ($this->____plugin_simple_plugin === null) {
         	$this->____plugin_simple_plugin = $this->____om->get(\Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Simple::class);
@@ -83,7 +83,7 @@ class Interceptor extends \Creatuity\Interception\Test\Unit\Custom\Module\Model\
      * plugin "advanced_plugin"
      * @return \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced
      */
-    public function ____plugin_advanced_plugin()
+    public function ____plugin_advanced_plugin() : \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced
     {
         if ($this->____plugin_advanced_plugin === null) {
         	$this->____plugin_advanced_plugin = $this->____om->get(\Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced::class);

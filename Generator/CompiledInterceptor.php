@@ -300,7 +300,7 @@ class CompiledInterceptor extends Interceptor
             'name' => $this->getGetterName($plugin),
             'parameters' => [],
             'body' => implode("\n", $body),
-            //'returnType' => $class,
+            'returnType' => $plugin['class'],
             'docblock' => [
                 'shortDescription' => 'plugin "' . $plugin['code'] . '"' . "\n" . '@return \\' . $plugin['class']
             ],
@@ -333,12 +333,18 @@ class CompiledInterceptor extends Interceptor
         }
 
         $body[] = "}";
-        
+        $returnType = $method->getReturnType();
+        $returnTypeValue = $returnType
+            ? ($returnType->allowsNull() ? '?' : '') .$returnType->getName()
+            : null;
+        if ($returnTypeValue === 'self') {
+            $returnTypeValue = $method->getDeclaringClass()->getName();
+        }
         return [
             'name' => ($method->returnsReference() ? '& ' : '') . $method->getName(),
             'parameters' =>array_map(array($this, '_getMethodParameterInfo'), $parameters),
             'body' => implode("\n", $body),
-            'returnType' => $method->getReturnType(),
+            'returnType' => $returnTypeValue,
             'docblock' => ['shortDescription' => '{@inheritdoc}'],
         ];
     }
