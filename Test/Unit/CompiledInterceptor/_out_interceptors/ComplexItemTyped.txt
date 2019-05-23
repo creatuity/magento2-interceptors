@@ -51,10 +51,10 @@ class Interceptor extends \Creatuity\Interception\Test\Unit\Custom\Module\Model\
         		parent::returnVoid();
         		
         		$this->____plugin_complex_plugin()->afterReturnVoid($this, null);
-        		break;
+        		return;
         	default:
         		parent::returnVoid();
-        		break;
+        		return;
         }
     }
 
