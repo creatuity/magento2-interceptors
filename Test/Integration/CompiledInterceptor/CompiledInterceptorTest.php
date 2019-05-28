@@ -4,15 +4,21 @@
  * See COPYING.txt for license details.
  */
 
-namespace Creatuity\Interception\Test\Unit\CompiledInterceptor;
+namespace Creatuity\Interception\Test\Integration\CompiledInterceptor;
 
 use Magento\Framework\App\AreaList;
 use Magento\Framework\Code\Generator\Io;
 use Creatuity\Interception\Generator\CompiledInterceptor;
 
 use Creatuity\Interception\Test\Unit\CompiledPluginList\CompiledPluginListTest;
-use \PHPUnit_Framework_MockObject_MockObject as MockObject;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItem;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItemTyped;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\Item;
+use PHPUnit\Framework\MockObject\MockObject as MockObject;
 
+/**
+ * Class CompiledInterceptorTest
+ */
 class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
 {
     /**
@@ -34,7 +40,6 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-
         $this->areaList = $this->getMockBuilder(AreaList::class)
             ->disableOriginalConstructor()
             ->getMock();
@@ -53,18 +58,21 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
         /** @var CompiledInterceptor|MockObject $interceptor */
         $interceptor = $this->getMockBuilder(CompiledInterceptor::class)
             ->setMethods(['_validateData'])
-            ->setConstructorArgs([
-                $this->areaList,
-                $className,
-                $resultClassName,
-                $this->ioGenerator,
-                null,
-                null,
-                (new CompiledPluginListTest())->createScopeReaders()
-            ])
+            ->setConstructorArgs(
+                [
+                    $this->areaList,
+                    $className,
+                    $resultClassName,
+                    $this->ioGenerator,
+                    null,
+                    null,
+                    (new CompiledPluginListTest())->createScopeReaders()
+                ]
+            )
             ->getMock();
 
-        $this->ioGenerator->method('generateResultFileName')->with('\\' . $resultClassName)->willReturn($fileName . '.php');
+        $this->ioGenerator->method('generateResultFileName')->with('\\' . $resultClassName)
+            ->willReturn($fileName . '.php');
 
         $code = file_get_contents(__DIR__ . '/_out_interceptors/' . $fileName . '.txt');
 
@@ -84,18 +92,18 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
     {
         return [
             [
-                \Creatuity\Interception\Test\Unit\Custom\Module\Model\Item::class,
-                \Creatuity\Interception\Test\Unit\Custom\Module\Model\Item\Interceptor::class,
+                Item::class,
+                Item::class . '\Interceptor',
                 'Item'
             ],
             [
-                \Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItem::class,
-                \Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItem\Interceptor::class,
+                ComplexItem::class,
+                ComplexItem::class . '\Interceptor',
                 'ComplexItem'
             ],
             [
-                \Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItemTyped::class,
-                \Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItemTyped\Interceptor::class,
+                ComplexItemTyped::class,
+                ComplexItemTyped::class . '\Interceptor',
                 'ComplexItemTyped'
             ],
         ];

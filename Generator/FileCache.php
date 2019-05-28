@@ -5,32 +5,39 @@
  */
 namespace Creatuity\Interception\Generator;
 
-
 use Magento\Framework\Config\CacheInterface;
-use Magento\Framework\Serialize\SerializerInterface;
 
-class FileCache implements CacheInterface, SerializerInterface
+/**
+ * Class FileCache
+ */
+class FileCache implements CacheInterface
 {
 
     private $cachePath;
 
     /**
      * FileCache constructor.
-     * @param null $cachePath
+     * @param null|string $cachePath
      */
     public function __construct($cachePath = null)
     {
-        $this->cachePath = ($cachePath === null ? BP . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'cache' : $cachePath);
+        if ($cachePath === null) {
+            $this->cachePath = BP . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'cache';
+        } else {
+            $this->cachePath = $cachePath;
+        }
     }
 
-
     /**
-     * @param $identifier
+     * Get cache path
+     *
+     * @param string $identifier
      * @return string
      */
     private function getCachePath($identifier)
     {
-        return $this->cachePath . DIRECTORY_SEPARATOR . str_replace('|', '_', $identifier . '.php');
+        $identifier = str_replace('|', '_', $identifier);
+        return $this->cachePath . DIRECTORY_SEPARATOR . $identifier . '.php';
     }
 
     /**
@@ -42,7 +49,7 @@ class FileCache implements CacheInterface, SerializerInterface
      */
     public function test($identifier)
     {
-        // TODO: Implement test() method.
+        return file_exists($this->getCachePath($identifier));
     }
 
     /**
@@ -78,6 +85,7 @@ class FileCache implements CacheInterface, SerializerInterface
                 $path,
                 '<?php return ' . var_export($data, true) . '?>'
             );
+            return true;
         }
     }
 
@@ -90,7 +98,7 @@ class FileCache implements CacheInterface, SerializerInterface
      */
     public function remove($identifier)
     {
-        // TODO: Implement remove() method.
+        return false;
     }
 
     /**
@@ -103,7 +111,7 @@ class FileCache implements CacheInterface, SerializerInterface
      */
     public function clean($mode = \Zend_Cache::CLEANING_MODE_ALL, array $tags = [])
     {
-        // TODO: Implement clean() method.
+        return false;
     }
 
     /**
@@ -113,7 +121,7 @@ class FileCache implements CacheInterface, SerializerInterface
      */
     public function getBackend()
     {
-        // TODO: Implement getBackend() method.
+        return null;
     }
 
     /**
@@ -123,32 +131,6 @@ class FileCache implements CacheInterface, SerializerInterface
      */
     public function getLowLevelFrontend()
     {
-        // TODO: Implement getLowLevelFrontend() method.
-    }
-
-    /**
-     * Serialize data into string
-     *
-     * @param string|int|float|bool|array|null $data
-     * @return string|bool
-     * @throws \InvalidArgumentException
-     * @since 101.0.0
-     */
-    public function serialize($data)
-    {
-        return $data;
-    }
-
-    /**
-     * Unserialize the given string
-     *
-     * @param string $string
-     * @return string|int|float|bool|array|null
-     * @throws \InvalidArgumentException
-     * @since 101.0.0
-     */
-    public function unserialize($string)
-    {
-        return $string;
+        return null;
     }
 }

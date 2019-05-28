@@ -16,6 +16,9 @@ use Magento\Framework\Config\ScopeInterface;
 use Magento\Framework\Interception\DefinitionInterface;
 use Magento\Framework\App\AreaList;
 
+/**
+ * Compiled interceptors generator, please see ../README.md for details
+ */
 class CompiledInterceptor extends EntityAbstract
 {
     /**
@@ -23,14 +26,29 @@ class CompiledInterceptor extends EntityAbstract
      */
     const ENTITY_TYPE = 'interceptor';
 
-    protected $plugins;
+    private $plugins;
 
-    protected $classMethods = [];
+    private $classMethods;
 
-    protected $classProperties = [];
+    private $classProperties;
 
-    protected $areaList;
+    /**
+     * @var \ReflectionClass
+     */
+    private $baseReflection;
 
+    private $areaList;
+
+    /**
+     * CompiledInterceptor constructor.
+     * @param AreaList $areaList
+     * @param null|string $sourceClassName
+     * @param null|string $resultClassName
+     * @param Io|null $ioObject
+     * @param CodeGeneratorInterface|null $classGenerator
+     * @param DefinedClasses|null $definedClasses
+     * @param null|array $plugins
+     */
     public function __construct(
         AreaList $areaList,
         $sourceClassName = null,
@@ -39,50 +57,114 @@ class CompiledInterceptor extends EntityAbstract
         CodeGeneratorInterface $classGenerator = null,
         DefinedClasses $definedClasses = null,
         $plugins = null
-    )
-    {
-        parent::__construct($sourceClassName,
-            $resultClassName ,
+    ) {
+        parent::__construct(
+            $sourceClassName,
+            $resultClassName,
             $ioObject,
             $classGenerator,
-            $definedClasses);
+            $definedClasses
+        );
 
         $this->areaList = $areaList;
         $this->plugins = $plugins;
     }
 
     /**
+     * Unused function required by production mode interface
+     *
+     * @param mixed $interceptedMethods
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function setInterceptedMethods($interceptedMethods)
     {
-        //NOOP
+        return;
     }
 
     /**
+     * Get all class methods
+     *
+     * @return array|null
+     * @throws \ReflectionException
+     */
+    protected function _getClassMethods()
+    {
+        $this->generateMethodsAndProperties();
+        return $this->classMethods;
+    }
+
+    /**
+     * Get all class properties
+     *
+     * @return array|null
+     * @throws \ReflectionException
+     */
+    protected function _getClassProperties()
+    {
+        $this->generateMethodsAndProperties();
+        return $this->classProperties;
+    }
+
+    /**
+     * Unused, required by interface
+     *
+     * @return array|void
+     */
+    protected function _getDefaultConstructorDefinition()
+    {
+    }
+
+    /**
+     * Generate class source
+     *
      * @return bool|string
      * @throws \ReflectionException
      */
     protected function _generateCode()
     {
-        $typeName = $this->getSourceClassName();
-        $reflection = new \ReflectionClass($typeName);
-
-        if ($reflection->isInterface()) {
+        if ($this->getSourceClassReflection()->isInterface()) {
             return false;
         } else {
-            $this->_classGenerator->setExtendedClass($typeName);
+            $this->_classGenerator->setExtendedClass($this->getSourceClassName());
         }
-
-        $this->classMethods = [];
-        $this->classProperties = [];
-        $this->injectPropertiesSettersToConstructor($reflection->getConstructor(), [
-            ScopeInterface::class => '____scope',
-            ObjectManagerInterface::class => '____om',
-        ]);
-        $this->overrideMethodsAndGeneratePluginGetters($reflection);
-
+        $this->generateMethodsAndProperties();
         return parent::_generateCode();
+    }
+
+    /**
+     * Generate all methods and properties
+     *
+     * @throws \ReflectionException
+     */
+    private function generateMethodsAndProperties()
+    {
+        if ($this->classMethods === null) {
+            $this->classMethods = [];
+            $this->classProperties = [];
+
+            $this->injectPropertiesSettersToConstructor(
+                $this->getSourceClassReflection()->getConstructor(),
+                [
+                    ScopeInterface::class => '____scope',
+                    ObjectManagerInterface::class => '____om',
+                ]
+            );
+            $this->overrideMethodsAndGeneratePluginGetters($this->getSourceClassReflection());
+        }
+    }
+
+    /**
+     * Get reflection of source class
+     *
+     * @return \ReflectionClass
+     * @throws \ReflectionException
+     */
+    private function getSourceClassReflection()
+    {
+        if ($this->baseReflection === null) {
+            $this->baseReflection = new \ReflectionClass($this->getSourceClassName());
+        }
+        return $this->baseReflection;
     }
 
     /**
@@ -97,14 +179,19 @@ class CompiledInterceptor extends EntityAbstract
             !in_array($method->getName(), ['__sleep', '__wakeup', '__clone']);
     }
 
-    protected function overrideMethodsAndGeneratePluginGetters(\ReflectionClass $reflection)
+    /**
+     * Generate compiled methods and plugin getters
+     *
+     * @param \ReflectionClass $reflection
+     */
+    private function overrideMethodsAndGeneratePluginGetters(\ReflectionClass $reflection)
     {
         $publicMethods = $reflection->getMethods(\ReflectionMethod::IS_PUBLIC);
 
         $allPlugins = [];
         foreach ($publicMethods as $method) {
             if ($this->isInterceptedMethod($method)) {
-                $config = $this->_getPluginsConfig($method, $allPlugins);
+                $config = $this->getPluginsConfig($method, $allPlugins);
                 if (!empty($config)) {
                     $this->classMethods[] = $this->getCompiledMethodInfo($method, $config);
                 }
@@ -112,13 +199,19 @@ class CompiledInterceptor extends EntityAbstract
         }
         foreach ($allPlugins as $plugins) {
             foreach ($plugins as $plugin) {
-                $this->classMethods[] = $this->_getPluginGetterInfo($plugin);
-                $this->classProperties[] = $this->_getPluginPropertyInfo($plugin);
+                $this->classMethods[] = $this->getPluginGetterInfo($plugin);
+                $this->classProperties[] = $this->getPluginPropertyInfo($plugin);
             }
         }
     }
 
-    protected function injectPropertiesSettersToConstructor(\ReflectionMethod $parentConstructor = null, $properties = [])
+    /**
+     * Generate class constructor adding required properties
+     *
+     * @param \ReflectionMethod|null $parentConstructor
+     * @param array $properties
+     */
+    private function injectPropertiesSettersToConstructor(\ReflectionMethod $parentConstructor = null, $properties = [])
     {
         if ($parentConstructor == null) {
             $parameters = [];
@@ -151,7 +244,7 @@ class CompiledInterceptor extends EntityAbstract
                 }
             }
         }
-        $parameters = array_map(array($this, '_getMethodParameterInfo'), $parameters);
+        $parameters = array_map([$this, '_getMethodParameterInfo'], $parameters);
         /* foreach ($extraParams as $type => $name) {
             array_unshift($parameters, [
                 'name' => $name,
@@ -163,7 +256,10 @@ class CompiledInterceptor extends EntityAbstract
         }
         foreach ($extraParams as $type => $name) {
             array_unshift($body, "//TODO fix di in production mode");
-            array_unshift($body, "\$$name = \\Magento\\Framework\\App\\ObjectManager::getInstance()->get(\\$type::class);");
+            array_unshift(
+                $body,
+                "\$$name = \\Magento\\Framework\\App\\ObjectManager::getInstance()->get(\\$type::class);"
+            );
         }
 
         $this->classMethods[] = [
@@ -172,19 +268,15 @@ class CompiledInterceptor extends EntityAbstract
             'body' => implode("\n", $body),
             'docblock' => ['shortDescription' => '{@inheritdoc}'],
         ];
-
     }
 
-    protected function _getClassMethods()
-    {
-        return $this->classMethods;
-    }
-
-    protected function _getClassProperties()
-    {
-        return $this->classProperties;
-    }
-
+    /**
+     * Adds tabulation to nested code block
+     *
+     * @param array $body
+     * @param array $sub
+     * @param int $indent
+     */
     private function addCodeSubBlock(&$body, $sub, $indent = 1)
     {
         foreach ($sub as $line) {
@@ -193,78 +285,167 @@ class CompiledInterceptor extends EntityAbstract
     }
 
     /**
-     * @param \ReflectionMethod $method
-     * @param $conf
-     * @param $parameters
+     * Generate source of before plugins
+     *
+     * @param array $plugins
+     * @param string $methodName
+     * @param string $extraParams
+     * @param string $parametersList
      * @return array
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
-     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
-    protected function _getMethodSourceFromConfig(\ReflectionMethod $method, $conf, $parameters, $returnVoid)
+    private function compileBeforePlugins($plugins, $methodName, $extraParams, $parametersList)
     {
-        $body = [];
-        $first = true;
-        $capName = ucfirst($method->getName());
-        $extraParams = empty($parameters) ? '' : (', ' . $this->_getParameterList($parameters));
+        $lines = [];
+        foreach ($plugins as $plugin) {
+            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this$extraParams);";
 
-        if (isset($conf[DefinitionInterface::LISTENER_BEFORE])) {
-            foreach ($conf[DefinitionInterface::LISTENER_BEFORE] as $plugin) {
-                if ($first) $first = false; else $body[] = "";
-
-                $call = "\$this->" . $this->getGetterName($plugin) . "()->before$capName(\$this$extraParams);";
-
-                if (!empty($parameters)) {
-                    $body[] = "\$beforeResult = " . $call;
-                    $body[] = "if (\$beforeResult !== null) list({$this->_getParameterList($parameters)}) = (array)\$beforeResult;";
-                } else {
-                    $body[] = $call;
-                }
+            if (!empty($parametersList)) {
+                $lines[] = "\$beforeResult = " . $call;
+                $lines[] = "if (\$beforeResult !== null) list({$parametersList}) = (array)\$beforeResult;";
+            } else {
+                $lines[] = $call;
             }
+            $lines[] = "";
         }
-
-
-        $chain = [];
-        $main = [];
-        if (isset($conf[DefinitionInterface::LISTENER_AROUND])) {
-            $plugin = $conf[DefinitionInterface::LISTENER_AROUND];
-            $main[] = "\$this->" . $this->getGetterName($plugin) . "()->around$capName(\$this, function({$this->_getParameterListForNextCallback($parameters)}){";
-            $this->addCodeSubBlock($main, $this->_getMethodSourceFromConfig($method, $plugin['next'] ?: [], $parameters, $returnVoid));
-            $main[] = "}$extraParams);";
-        } else {
-            $main[] = "parent::{$method->getName()}({$this->_getParameterList($parameters)});";
-        }
-        $chain[] = $main;
-
-        if (isset($conf[DefinitionInterface::LISTENER_AFTER])) {
-            foreach ($conf[DefinitionInterface::LISTENER_AFTER] as $plugin) {
-                if (!$returnVoid) {
-                    $chain[] = ["((\$tmp = \$this->" . $this->getGetterName($plugin) . "()->after$capName(\$this, \$result$extraParams)) !== null) ? \$tmp : \$result;"];
-                } else {
-                    $chain[] = ["\$this->" . $this->getGetterName($plugin) . "()->after$capName(\$this, null$extraParams);"];
-                }
-            }
-        }
-        foreach ($chain as $lp => $piece) {
-            if ($first) $first = false; else $body[] = "";
-            if (!$returnVoid) {
-                $piece[0] = (($lp + 1 == count($chain)) ? "return " : "\$result = ") . $piece[0];
-            }
-            foreach ($piece as $line) {
-                $body[] = $line;
-            }
-        }
-        if ($returnVoid) {
-            $body[] = 'return;';
-        }
-        
-        return $body;
+        return $lines;
     }
 
     /**
-     * @param \ReflectionParameter[]  $parameters
+     * Generate source of around plugin
+     *
+     * @param string $methodName
+     * @param array $plugin
+     * @param string $capitalizedName
+     * @param string $extraParams
+     * @param array $parameters
+     * @param bool $returnVoid
+     * @return array
+     */
+    private function compileAroundPlugin($methodName, $plugin, $capitalizedName, $extraParams, $parameters, $returnVoid)
+    {
+        $lines = [];
+        $lines[] = "\$this->{$this->getGetterName($plugin)}()->around$capitalizedName" .
+            "(\$this, function({$this->getParameterListForNextCallback($parameters)}){";
+        $this->addCodeSubBlock(
+            $lines,
+            $this->getMethodSourceFromConfig($methodName, $plugin['next'] ?: [], $parameters, $returnVoid)
+        );
+        $lines[] = "}$extraParams);";
+        return $lines;
+    }
+
+    /**
+     * Generate source of after plugins
+     *
+     * @param array $plugins
+     * @param string $methodName
+     * @param string $extraParams
+     * @param bool $returnVoid
+     * @return array
+     */
+    private function compileAfterPlugins($plugins, $methodName, $extraParams, $returnVoid)
+    {
+        $lines = [];
+        foreach ($plugins as $plugin) {
+            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ";
+
+            if (!$returnVoid) {
+                $lines[] = ["((\$tmp = $call\$result$extraParams)) !== null) ? \$tmp : \$result;"];
+            } else {
+                $lines[] = ["{$call}null$extraParams);"];
+            }
+        }
+        return $lines;
+    }
+
+    /**
+     * Generate interceptor source using config
+     *
+     * @param string $methodName
+     * @param array $conf
+     * @param array $parameters
+     * @param bool $returnVoid
+     * @return array
+     */
+    private function getMethodSourceFromConfig($methodName, $conf, $parameters, $returnVoid)
+    {
+        $capitalizedName = ucfirst($methodName);
+        $parametersList = $this->getParameterList($parameters);
+        $extraParams = empty($parameters) ? '' : (', ' . $parametersList);
+
+        if (isset($conf[DefinitionInterface::LISTENER_BEFORE])) {
+            $body = $this->compileBeforePlugins(
+                $conf[DefinitionInterface::LISTENER_BEFORE],
+                'before' . $capitalizedName,
+                $extraParams,
+                $parametersList
+            );
+        } else {
+            $body = [];
+        }
+
+        $resultChain = [];
+        if (isset($conf[DefinitionInterface::LISTENER_AROUND])) {
+            $resultChain[] = $this->compileAroundPlugin(
+                $methodName,
+                $conf[DefinitionInterface::LISTENER_AROUND],
+                $capitalizedName,
+                $extraParams,
+                $parameters,
+                $returnVoid
+            );
+        } else {
+            $resultChain[] = ["parent::{$methodName}({$this->getParameterList($parameters)});"];
+        }
+
+        if (isset($conf[DefinitionInterface::LISTENER_AFTER])) {
+            $resultChain = array_merge(
+                $resultChain,
+                $this->compileAfterPlugins(
+                    $conf[DefinitionInterface::LISTENER_AFTER],
+                    'after' . $capitalizedName,
+                    $extraParams,
+                    $returnVoid
+                )
+            );
+        }
+        return array_merge($body, $this->getResultChainLines($resultChain, $returnVoid));
+    }
+
+    /**
+     * Implode result chain into list of assignments
+     *
+     * @param array $resultChain
+     * @param bool $returnVoid
+     * @return array
+     */
+    private function getResultChainLines($resultChain, $returnVoid)
+    {
+        $lines = [];
+        $first = true;
+        foreach ($resultChain as $lp => $piece) {
+            if ($first) {
+                $first = false;
+            } else {
+                $lines[] = "";
+            }
+            if (!$returnVoid) {
+                $piece[0] = (($lp + 1 == count($resultChain)) ? "return " : "\$result = ") . $piece[0];
+            }
+            foreach ($piece as $line) {
+                $lines[] = $line;
+            }
+        }
+        return $lines;
+    }
+
+    /**
+     * Get parameters definition for next callback
+     *
+     * @param array $parameters
      * @return string
      */
-    protected function _getParameterListForNextCallback(array $parameters)
+    private function getParameterListForNextCallback(array $parameters)
     {
         $ret = [];
         foreach ($parameters as $parameter) {
@@ -281,10 +462,12 @@ class CompiledInterceptor extends EntityAbstract
     }
 
     /**
-     * @param \ReflectionParameter[]  $parameters
+     * Implodes parameters into list for call
+     *
+     * @param array(\ReflectionParameter) $parameters
      * @return string
      */
-    protected function _getParameterList(array $parameters)
+    private function getParameterList(array $parameters)
     {
         $ret = [];
         foreach ($parameters as $parameter) {
@@ -293,12 +476,24 @@ class CompiledInterceptor extends EntityAbstract
         return implode(', ', $ret);
     }
 
-    protected function getGetterName($plugin)
+    /**
+     * Get plugin getter name
+     *
+     * @param array $plugin
+     * @return string
+     */
+    private function getGetterName($plugin)
     {
         return '____plugin_' . $plugin['clean_name'];
     }
 
-    protected function _getPluginPropertyInfo($plugin)
+    /**
+     * Get plugin property cache attribute
+     *
+     * @param array $plugin
+     * @return array
+     */
+    private function getPluginPropertyInfo($plugin)
     {
         return [
             'name' => '____plugin_' . $plugin['clean_name'],
@@ -309,7 +504,13 @@ class CompiledInterceptor extends EntityAbstract
         ];
     }
 
-    protected function _getPluginGetterInfo($plugin)
+    /**
+     * Prepares plugin getter for code generator
+     *
+     * @param array $plugin
+     * @return array
+     */
+    private function getPluginGetterInfo($plugin)
     {
         $body = [];
         $varName = "\$this->____plugin_" . $plugin['clean_name'];
@@ -321,6 +522,7 @@ class CompiledInterceptor extends EntityAbstract
 
         return [
             'name' => $this->getGetterName($plugin),
+            'visibility' => 'private',
             'parameters' => [],
             'body' => implode("\n", $body),
             'returnType' => $plugin['class'],
@@ -330,52 +532,89 @@ class CompiledInterceptor extends EntityAbstract
         ];
     }
 
+    /**
+     * Get compiled method data for code generator
+     *
+     * @param \ReflectionMethod $method
+     * @param array $config
+     * @return array
+     */
     private function getCompiledMethodInfo(\ReflectionMethod $method, $config)
     {
         $parameters = $method->getParameters();
         $returnsVoid = ($method->hasReturnType() && $method->getReturnType()->getName() == 'void');
 
         $body = [
-            'switch($this->____scope->getCurrentScope()){'
+            'switch ($this->____scope->getCurrentScope()) {'
         ];
 
-        $cases = [];
-        //group cases by config
-        foreach ($config as $scope => $conf) {
-            $key = md5(serialize($conf));
-            if (!isset($cases[$key])) $cases[$key] = ['cases'=>[], 'conf'=>$conf];
-            $cases[$key]['cases'][] = "\tcase '$scope':";
-        }
-        //call parent method for scopes with no plugins (or when no scope is set)
-        $cases[] = ['cases'=>["\tdefault:"], 'conf'=>[]];
-
-        foreach ($cases as $case) {
+        foreach ($this->getScopeCasesFromConfig($config) as $case) {
             $body = array_merge($body, $case['cases']);
-            $this->addCodeSubBlock($body, $this->_getMethodSourceFromConfig($method, $case['conf'], $parameters, $returnsVoid), 2);
-            //$body[] = "\t\tbreak;";
+            $this->addCodeSubBlock(
+                $body,
+                $this->getMethodSourceFromConfig($method->getName(), $case['conf'], $parameters, $returnsVoid),
+                2
+            );
+            if ($returnsVoid) {
+                $body[] = "\t\tbreak;";
+            }
         }
 
         $body[] = "}";
         $returnType = $method->getReturnType();
         $returnTypeValue = $returnType
-            ? ($returnType->allowsNull() ? '?' : '') .$returnType->getName()
+            ? ($returnType->allowsNull() ? '?' : '') . $returnType->getName()
             : null;
         if ($returnTypeValue === 'self') {
             $returnTypeValue = $method->getDeclaringClass()->getName();
         }
         return [
             'name' => ($method->returnsReference() ? '& ' : '') . $method->getName(),
-            'parameters' =>array_map(array($this, '_getMethodParameterInfo'), $parameters),
+            'parameters' =>array_map([$this, '_getMethodParameterInfo'], $parameters),
             'body' => implode("\n", $body),
             'returnType' => $returnTypeValue,
             'docblock' => ['shortDescription' => '{@inheritdoc}'],
         ];
     }
 
-    protected function _getPluginInfo(CompiledPluginList $plugins, $code, $className, &$allPlugins, $next = null)
+    /**
+     * Get scope cases from config
+     *
+     * @param array $config
+     * @return array
+     */
+    private function getScopeCasesFromConfig($config)
+    {
+        $cases = [];
+        //group cases by config
+        foreach ($config as $scope => $conf) {
+            $key = md5(serialize($conf));
+            if (!isset($cases[$key])) {
+                $cases[$key] = ['cases'=>[], 'conf'=>$conf];
+            }
+            $cases[$key]['cases'][] = "\tcase '$scope':";
+        }
+        //call parent method for scopes with no plugins (or when no scope is set)
+        $cases[] = ['cases'=>["\tdefault:"], 'conf'=>[]];
+        return $cases;
+    }
+
+    /**
+     * Generate array with plugin info
+     *
+     * @param CompiledPluginList $plugins
+     * @param string $code
+     * @param string $className
+     * @param array $allPlugins
+     * @param null|string $next
+     * @return mixed
+     */
+    private function getPluginInfo(CompiledPluginList $plugins, $code, $className, &$allPlugins, $next = null)
     {
         $className = $plugins->getPluginType($className, $code);
-        if (!isset($allPlugins[$code])) $allPlugins[$code] = [];
+        if (!isset($allPlugins[$code])) {
+            $allPlugins[$code] = [];
+        }
         if (empty($allPlugins[$code][$className])) {
             $suffix = count($allPlugins[$code]) ? count($allPlugins[$code]) + 1 : '';
             $allPlugins[$code][$className] = [
@@ -384,37 +623,74 @@ class CompiledInterceptor extends EntityAbstract
                 'clean_name' => preg_replace("/[^A-Za-z0-9_]/", '_', $code . $suffix)
             ];
         }
-        $ret = $allPlugins[$code][$className];
-        $ret['next'] = $next;
-        return $ret;
-
+        $result = $allPlugins[$code][$className];
+        $result['next'] = $next;
+        return $result;
     }
 
-    protected function _getPluginsChain(CompiledPluginList $plugins, $className, $method, &$allPlugins, $next = '__self')
+    /**
+     * Get next set of plugins
+     *
+     * @param CompiledPluginList $plugins
+     * @param string $className
+     * @param string $method
+     * @param array $allPlugins
+     * @param string $next
+     * @return array
+     */
+    private function getPluginsChain(CompiledPluginList $plugins, $className, $method, &$allPlugins, $next = '__self')
     {
-        $ret = $plugins->getNext($className, $method, $next);
-        if(!empty($ret[DefinitionInterface::LISTENER_BEFORE])) {
-            foreach ($ret[DefinitionInterface::LISTENER_BEFORE] as $k => $code) {
-                $ret[DefinitionInterface::LISTENER_BEFORE][$k] = $this->_getPluginInfo($plugins, $code, $className, $allPlugins);
+        $result = $plugins->getNext($className, $method, $next);
+        if (!empty($result[DefinitionInterface::LISTENER_BEFORE])) {
+            foreach ($result[DefinitionInterface::LISTENER_BEFORE] as $k => $code) {
+                $result[DefinitionInterface::LISTENER_BEFORE][$k] = $this->getPluginInfo(
+                    $plugins,
+                    $code,
+                    $className,
+                    $allPlugins
+                );
             }
         }
-        if(!empty($ret[DefinitionInterface::LISTENER_AFTER])) {
-            foreach ($ret[DefinitionInterface::LISTENER_AFTER] as $k => $code) {
-                $ret[DefinitionInterface::LISTENER_AFTER][$k] = $this->_getPluginInfo($plugins, $code, $className, $allPlugins);
+        if (!empty($result[DefinitionInterface::LISTENER_AFTER])) {
+            foreach ($result[DefinitionInterface::LISTENER_AFTER] as $k => $code) {
+                $result[DefinitionInterface::LISTENER_AFTER][$k] = $this->getPluginInfo(
+                    $plugins,
+                    $code,
+                    $className,
+                    $allPlugins
+                );
             }
         }
-        if (isset($ret[DefinitionInterface::LISTENER_AROUND])) {
-            $ret[DefinitionInterface::LISTENER_AROUND] = $this->_getPluginInfo($plugins, $ret[DefinitionInterface::LISTENER_AROUND], $className, $allPlugins,
-                $this->_getPluginsChain($plugins, $className, $method, $allPlugins, $ret[DefinitionInterface::LISTENER_AROUND]));
+        if (isset($result[DefinitionInterface::LISTENER_AROUND])) {
+            $result[DefinitionInterface::LISTENER_AROUND] = $this->getPluginInfo(
+                $plugins,
+                $result[DefinitionInterface::LISTENER_AROUND],
+                $className,
+                $allPlugins,
+                $this->getPluginsChain(
+                    $plugins,
+                    $className,
+                    $method,
+                    $allPlugins,
+                    $result[DefinitionInterface::LISTENER_AROUND]
+                )
+            );
         }
-        return $ret;
+        return $result;
     }
 
-    protected function _getPluginsConfig(\ReflectionMethod $method, &$allPlugins)
+    /**
+     * Generates recursive maps of plugins for given method
+     *
+     * @param \ReflectionMethod $method
+     * @param array $allPlugins
+     * @return array
+     */
+    private function getPluginsConfig(\ReflectionMethod $method, &$allPlugins)
     {
         $className = ltrim($this->getSourceClassName(), '\\');
 
-        $ret = array();
+        $result = [];
         if ($this->plugins === null) {
             $this->plugins = [];
             foreach ($this->areaList->getCodes() as $scope) {
@@ -422,22 +698,11 @@ class CompiledInterceptor extends EntityAbstract
             }
         }
         foreach ($this->plugins as $scope => $pluginsList) {
-            $p = $this->_getPluginsChain($pluginsList, $className, $method->getName(), $allPlugins);
-            if ($p) {
-                $ret[$scope] = $p;
+            $pluginChain = $this->getPluginsChain($pluginsList, $className, $method->getName(), $allPlugins);
+            if ($pluginChain) {
+                $result[$scope] = $pluginChain;
             }
-
         }
-        return $ret;
-    }
-
-    /**
-     * Get default constructor definition for generated class
-     *
-     * @return array
-     */
-    protected function _getDefaultConstructorDefinition()
-    {
-        // TODO: Implement _getDefaultConstructorDefinition() method.
+        return $result;
     }
 }

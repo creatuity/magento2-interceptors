@@ -7,6 +7,9 @@ namespace Creatuity\Interception\Generator;
 
 use Magento\Framework\Config\ScopeInterface;
 
+/**
+ * Class StaticScope
+ */
 class StaticScope implements ScopeInterface
 {
     /**
@@ -14,6 +17,11 @@ class StaticScope implements ScopeInterface
      */
     protected $scope;
 
+    /**
+     * StaticScope constructor.
+     *
+     * @param string $scope
+     */
     public function __construct($scope)
     {
         $this->scope = $scope;
@@ -24,17 +32,20 @@ class StaticScope implements ScopeInterface
      *
      * @return string
      */
-    public function getCurrentScope() {
+    public function getCurrentScope()
+    {
         return $this->scope;
     }
 
     /**
+     * Unused interface method
+     *
      * @param string $scope
      * @throws \Exception
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function setCurrentScope($scope){
-        throw new \Exception('readonly');
+    public function setCurrentScope($scope)
+    {
+        throw new \RuntimeException('readonly');
     }
-
 }

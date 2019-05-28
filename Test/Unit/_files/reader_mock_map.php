@@ -4,25 +4,33 @@
  * See COPYING.txt for license details.
  */
 
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItem;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItemTyped;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\Item;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\Item\Enhanced;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Complex;
+use Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Simple;
+
 return [
     [
         'global',
         [
-            \Creatuity\Interception\Test\Unit\Custom\Module\Model\Item::class => [
+            Item::class => [
                 'plugins' => [
                     'simple_plugin' => [
                         'sortOrder' => 10,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Simple::class,
+                            Simple::class,
                     ],
                 ],
             ],
-            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItem::class => [
+            ComplexItem::class => [
                 'plugins' => [
                     'advanced_plugin' => [
                         'sortOrder' => 5,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced::class,
+                            Advanced::class,
                     ],
                 ],
             ],
@@ -31,40 +39,40 @@ return [
     [
         'backend',
         [
-            \Creatuity\Interception\Test\Unit\Custom\Module\Model\Item::class => [
+            Item::class => [
                 'plugins' => [
                     'advanced_plugin' => [
                         'sortOrder' => 5,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced::class,
+                            Advanced::class,
                     ],
                 ],
             ],
-            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItem::class => [
+            ComplexItem::class => [
                 'plugins' => [
                     'complex_plugin' => [
                         'sortOrder' => 15,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Complex::class,
+                            Complex::class,
                     ],
                     'advanced_plugin' => [
                         'sortOrder' => 5,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced::class,
+                            Advanced::class,
                     ],
                 ],
             ],
-            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ComplexItemTyped::class => [
+            ComplexItemTyped::class => [
                 'plugins' => [
                     'complex_plugin' => [
                         'sortOrder' => 25,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Complex::class,
+                            Complex::class,
                     ],
                     'advanced_plugin' => [
                         'sortOrder' => 5,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced::class,
+                            Advanced::class,
                     ],
                 ],
             ],
@@ -72,14 +80,14 @@ return [
     ],
     [
         'frontend',
-        [\Creatuity\Interception\Test\Unit\Custom\Module\Model\Item::class => [
+        [Item::class => [
                 'plugins' => ['simple_plugin' => ['disabled' => true]],
-            ], \Creatuity\Interception\Test\Unit\Custom\Module\Model\Item\Enhanced::class => [
+            ], Enhanced::class => [
                 'plugins' => [
                     'advanced_plugin' => [
                         'sortOrder' => 5,
                         'instance' =>
-                            \Creatuity\Interception\Test\Unit\Custom\Module\Model\ItemPlugin\Advanced::class,
+                            Advanced::class,
                     ],
                 ],
             ],
