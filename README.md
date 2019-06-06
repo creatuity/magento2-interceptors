@@ -19,9 +19,10 @@ To use compiled interceptors in developer mode please add following preference t
 <preference for="Magento\Framework\Interception\Code\Generator\Interceptor" type="Creatuity\Interception\Generator\CompiledInterceptor" />
 ```
 
-To use compiled interceptors in production mode please add following preference to your di.xml
+To use compiled interceptors in production or default mode please add following preferences to your di.xml
 ```
 <preference for="Magento\Setup\Module\Di\Code\Generator\Interceptor" type="Creatuity\Interception\Generator\CompiledInterceptor" />
+<preference for="Magento\Setup\Module\Di\Compiler\Config\Chain\InterceptorSubstitution" type="Creatuity\Interception\Generator\CompiledInterceptorSubstitution" />
 ```
 
 Clear generated files and cache:
