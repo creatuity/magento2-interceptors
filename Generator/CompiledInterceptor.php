@@ -6,7 +6,6 @@
 
 namespace Creatuity\Interception\Generator;
 
-use Magento\Framework\App\ObjectManager;
 use Magento\Framework\Code\Generator\CodeGeneratorInterface;
 use Magento\Framework\Code\Generator\DefinedClasses;
 use Magento\Framework\Code\Generator\Io;
@@ -14,7 +13,6 @@ use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Code\Generator\EntityAbstract;
 use Magento\Framework\Config\ScopeInterface;
 use Magento\Framework\Interception\DefinitionInterface;
-use Magento\Framework\App\AreaList;
 
 /**
  * Compiled interceptors generator, please see ../README.md for details

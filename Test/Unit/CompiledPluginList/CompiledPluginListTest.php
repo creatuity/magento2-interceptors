@@ -5,6 +5,7 @@
  */
 namespace Creatuity\Interception\Test\Unit\CompiledPluginList;
 
+use Creatuity\Interception\Generator\StaticScope;
 use Magento\Framework\App\ObjectManager;
 use Creatuity\Interception\Generator\CompiledPluginList;
 use Creatuity\Interception\Test\Unit\Custom\Module\Model\Item;
@@ -49,7 +50,7 @@ class CompiledPluginListTest extends \PHPUnit\Framework\TestCase
                 CompiledPluginList::class,
                 [
                     'objectManager' => $omMock,
-                    'scope' => $readerLine[0],
+                    'scope' => new StaticScope($readerLine[0]),
                     'reader' => $readerMock,
                     'omConfig' => $omConfigMock,
                     'cachePath' => false

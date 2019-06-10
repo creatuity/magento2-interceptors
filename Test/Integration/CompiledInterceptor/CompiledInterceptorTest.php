@@ -7,6 +7,7 @@
 namespace Creatuity\Interception\Test\Integration\CompiledInterceptor;
 
 use Creatuity\Interception\Generator\AreasPluginList;
+use Creatuity\Interception\Generator\StaticScope;
 use Magento\Framework\App\AreaList;
 use Magento\Framework\Code\Generator\Io;
 use Creatuity\Interception\Generator\CompiledInterceptor;
@@ -72,7 +73,7 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
                 CompiledPluginList::class,
                 [
                     'objectManager' => $omMock,
-                    'scope' => $readerLine[0],
+                    'scope' => new StaticScope($readerLine[0]),
                     'reader' => $readerMock,
                     'omConfig' => $omConfigMock,
                     'cachePath' => false
@@ -132,7 +133,11 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
         /*
         eval( $code );
         $className  = "\\$resultClassName";
-        $interceptor = new $className();
+        $interceptor = new $className(
+            ??,
+            new StaticScope('frontend')
+        );
+        $interceptor->getName();
         */
     }
 
