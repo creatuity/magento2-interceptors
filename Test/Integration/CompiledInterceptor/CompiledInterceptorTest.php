@@ -7,6 +7,7 @@
 namespace Creatuity\Interception\Test\Integration\CompiledInterceptor;
 
 use Creatuity\Interception\Generator\AreasPluginList;
+use Creatuity\Interception\Generator\FileCache;
 use Creatuity\Interception\Generator\StaticScope;
 use Magento\Framework\App\AreaList;
 use Magento\Framework\Code\Generator\Io;
@@ -22,6 +23,7 @@ use Psr\Log\NullLogger;
 
 /**
  * Class CompiledInterceptorTest
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
 {
@@ -68,6 +70,8 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
         $omConfigMock->expects($this->any())->method('getOriginalInstanceType')->will($this->returnArgument(0));
         $ret = [];
         $objectManagerHelper = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
+        //clear static cache
+        (new FileCache())->clean();
         foreach ($readerMap as $readerLine) {
             $ret[$readerLine[0]] = $objectManagerHelper->getObject(
                 CompiledPluginList::class,
@@ -75,8 +79,7 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
                     'objectManager' => $omMock,
                     'scope' => new StaticScope($readerLine[0]),
                     'reader' => $readerMock,
-                    'omConfig' => $omConfigMock,
-                    'cachePath' => false
+                    'omConfig' => $omConfigMock
                 ]
             );
         }
@@ -102,7 +105,6 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
                 'plugins' => $this->createScopeReaders()
             ]
         );
-
 
         /** @var CompiledInterceptor|MockObject $interceptor */
         $interceptor = $this->getMockBuilder(CompiledInterceptor::class)
