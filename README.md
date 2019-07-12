@@ -29,7 +29,7 @@ And following preferences to work in production or default modes:
 
 Those are enabled by default in module `di.xml`. 
 
-Hovewer this module does not touch the default generation method so you can override above preferences to fallback to the default mechanism for all or selected modes.
+However this module does not touch the default generation method so you can override above preferences to fallback to the default mechanism for all or selected modes.
  
 
 ### TECHNICAL DETAILS 
