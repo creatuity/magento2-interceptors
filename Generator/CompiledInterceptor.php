@@ -530,7 +530,6 @@ class CompiledInterceptor extends EntityAbstract
             'visibility' => 'private',
             'parameters' => [],
             'body' => implode("\n", $body),
-            'returnType' => $plugin['class'],
             'docblock' => [
                 'shortDescription' => 'plugin "' . $plugin['code'] . '"' . "\n" . '@return \\' . $plugin['class']
             ],
