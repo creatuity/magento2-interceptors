@@ -10,6 +10,7 @@ use Magento\Framework\Config\ReaderInterface;
 use Magento\Framework\Config\ScopeInterface;
 use Magento\Framework\Interception\PluginList\PluginList;
 use Magento\Framework\Interception\ObjectManager\ConfigInterface;
+use Magento\Framework\Interception\PluginListGenerator;
 use Magento\Framework\ObjectManager\Config\Reader\Dom;
 use Magento\Framework\ObjectManager\Relations\Runtime as ObjectManagerRelationsRuntime;
 use Magento\Framework\Interception\Definition\Runtime as InterceptionDefinitionRuntime;
@@ -20,6 +21,12 @@ use Magento\Framework\ObjectManager\Definition\Runtime as ObjectManagerDefinitio
  */
 class CompiledPluginList extends PluginList
 {
+
+    /**
+     * @var PluginListGenerator
+     */
+    private $pluginListGenerator;
+
     /**
      * CompiledPluginList constructor.
      * @param ObjectManager $objectManager
@@ -39,6 +46,9 @@ class CompiledPluginList extends PluginList
             $reader = $objectManager->get(Dom::class);
             $omConfig = $objectManager->get(ConfigInterface::class);
         }
+
+        $this->pluginListGenerator = $objectManager->get(PluginListGenerator::class);
+
         parent::__construct(
             $reader,
             $scope,
@@ -50,7 +60,9 @@ class CompiledPluginList extends PluginList
             new ObjectManagerDefinitionRuntime(),
             ['global'],
             'compiled_plugins',
-            new NoSerialize()
+            new NoSerialize(),
+            null,
+            $this->pluginListGenerator
         );
     }
 
@@ -87,5 +99,17 @@ class CompiledPluginList extends PluginList
     public function setScope(ScopeInterface $scope)
     {
         $this->_configScope = $scope;
+    }
+
+    /**
+     * @inheridoc
+     */
+    protected function _loadScopedData()
+    {
+        $closure = function ($scope) {
+            $this->scopeConfig->setCurrentScope($scope);
+        };
+        $closure->call($this->pluginListGenerator, $this->_configScope->getCurrentScope());
+        parent::_loadScopedData();
     }
 }
