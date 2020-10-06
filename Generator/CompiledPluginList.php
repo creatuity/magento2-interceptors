@@ -107,9 +107,12 @@ class CompiledPluginList extends PluginList
     protected function _loadScopedData()
     {
         $closure = function ($scope) {
+            $previousScope = $this->scopeConfig->getCurrentScope();
             $this->scopeConfig->setCurrentScope($scope);
+            return $previousScope;
         };
-        $closure->call($this->pluginListGenerator, $this->_configScope->getCurrentScope());
+        $previousScope = $closure->call($this->pluginListGenerator, $this->_configScope->getCurrentScope());
         parent::_loadScopedData();
+        $closure->call($this->pluginListGenerator, $previousScope);
     }
 }
