@@ -154,6 +154,7 @@ class CompiledInterceptor extends EntityAbstract
                 ];
             }
             $this->classMethods[] = $this->_getDefaultConstructorDefinition();
+            $this->overrideMagicMethods($this->getSourceClassReflection());
             $this->overrideMethodsAndGeneratePluginGetters($this->getSourceClassReflection());
         }
     }
@@ -195,6 +196,22 @@ class CompiledInterceptor extends EntityAbstract
     {
         return !($method->isConstructor() || $method->isFinal() || $method->isStatic() || $method->isDestructor()) &&
             !in_array($method->getName(), ['__sleep', '__wakeup', '__clone']);
+    }
+
+    /**
+     * Generate compiled magic methods (if needed)
+     *
+     * @param \ReflectionClass $reflection
+     * @return void
+     */
+    protected function overrideMagicMethods(\ReflectionClass $reflection)
+    {
+        if ($reflection->hasMethod('__sleep')) {
+            $this->classMethods[] = $this->compileSleep($reflection->getMethod('__sleep'));
+        }
+        if ($reflection->hasMethod('__wakeup')) {
+            $this->classMethods[] = $this->compileWakeup($reflection->getMethod('__wakeup'));
+        }
     }
 
     /**
@@ -287,6 +304,61 @@ class CompiledInterceptor extends EntityAbstract
         foreach ($sub as $line) {
             $body[] = str_repeat("\t", $indent) . $line;
         }
+    }
+
+    /**
+     * Generate source of magic method __sleep
+     *
+     * @param \ReflectionMethod $parentSleepMethod
+     * @return array
+     */
+    private function compileSleep(\ReflectionMethod $parentSleepMethod)
+    {
+        $body = [
+            '$properties = parent::__sleep();',
+            'return array_diff(',
+            "\t" . '$properties,',
+            "\t" . '[',
+        ];
+
+        foreach (static::propertiesToInjectToConstructor() as $name) {
+            $body[] = "\t\t'$name',";
+        }
+
+        $body[] = "\t" . ']';
+        $body[] = ');';
+
+        return [
+            'name' => '__sleep',
+            'parameters' => [],
+            'body' => implode("\n", $body),
+            'docblock' => ['shortDescription' => '{@inheritdoc}'],
+        ];
+    }
+
+    /**
+     * Generate source of magic method __wakeup
+     *
+     * @param \ReflectionMethod $parentSleepMethod
+     * @return array
+     */
+    private function compileWakeup(\ReflectionMethod $parentSleepMethod)
+    {
+        $body = [
+            'parent::__wakeup();',
+            '$objectManager = \Magento\Framework\App\ObjectManager::getInstance();',
+        ];
+
+        foreach (static::propertiesToInjectToConstructor() as $type => $name) {
+            $body[] = '$this->' . $name . ' = $objectManager->get(\\' . $type . '::class);';
+        }
+
+        return [
+            'name' => '__wakeup',
+            'parameters' => [],
+            'body' => implode("\n", $body),
+            'docblock' => ['shortDescription' => '{@inheritdoc}'],
+        ];
     }
 
     /**
