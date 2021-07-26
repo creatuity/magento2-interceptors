@@ -374,11 +374,11 @@ class CompiledInterceptor extends EntityAbstract
     {
         $lines = [];
         foreach ($plugins as $plugin) {
-            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this$extraParams);";
+            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ...array_values(\$arguments));";
 
             if (!empty($parametersList)) {
                 $lines[] = "\$beforeResult = " . $call;
-                $lines[] = "if (\$beforeResult !== null) list({$parametersList}) = (array)\$beforeResult;";
+                $lines[] = "if (\$beforeResult !== null) \$arguments = (array)\$beforeResult;";
             } else {
                 $lines[] = $call;
             }
@@ -402,12 +402,12 @@ class CompiledInterceptor extends EntityAbstract
     {
         $lines = [];
         $lines[] = "\$this->{$this->getGetterName($plugin)}()->around$capitalizedName" .
-            "(\$this, function({$this->getParameterListForNextCallback($parameters)}){";
+            "(\$this, function(...\$arguments){";
         $this->addCodeSubBlock(
             $lines,
             $this->getMethodSourceFromConfig($methodName, $plugin['next'] ?: [], $parameters, $returnVoid)
         );
-        $lines[] = "}$extraParams);";
+        $lines[] = "}, ...array_values(\$arguments));";
         return $lines;
     }
 
@@ -427,9 +427,9 @@ class CompiledInterceptor extends EntityAbstract
             $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ";
 
             if (!$returnVoid) {
-                $lines[] = ["((\$tmp = $call\$result$extraParams)) !== null) ? \$tmp : \$result;"];
+                $lines[] = ["((\$tmp = $call\$result, ...array_values(\$arguments))) !== null) ? \$tmp : \$result;"];
             } else {
-                $lines[] = ["{$call}null$extraParams);"];
+                $lines[] = ["{$call}null, ...array_values(\$arguments));"];
             }
         }
         return $lines;
@@ -460,6 +460,7 @@ class CompiledInterceptor extends EntityAbstract
         } else {
             $body = [];
         }
+        array_unshift($body, '$arguments = func_get_args();');
 
         $resultChain = [];
         if (isset($conf[DefinitionInterface::LISTENER_AROUND])) {
@@ -472,7 +473,7 @@ class CompiledInterceptor extends EntityAbstract
                 $returnVoid
             );
         } else {
-            $resultChain[] = ["parent::{$methodName}({$this->getParameterList($parameters)});"];
+            $resultChain[] = ["parent::{$methodName}(...array_values(\$arguments));"];
         }
 
         if (isset($conf[DefinitionInterface::LISTENER_AFTER])) {
@@ -514,28 +515,6 @@ class CompiledInterceptor extends EntityAbstract
             }
         }
         return $lines;
-    }
-
-    /**
-     * Get parameters definition for next callback
-     *
-     * @param array $parameters
-     * @return string
-     */
-    private function getParameterListForNextCallback(array $parameters)
-    {
-        $ret = [];
-        foreach ($parameters as $parameter) {
-            $ret [] =
-                ($parameter->isPassedByReference() ? '&' : '') .
-                "\${$parameter->getName()}" .
-                ($parameter->isDefaultValueAvailable() ?
-                    ' = ' . ($parameter->isDefaultValueConstant() ?
-                        $parameter->getDefaultValueConstantName() :
-                        str_replace("\n", '', var_export($parameter->getDefaultValue(), true))) :
-                    '');
-        }
-        return implode(', ', $ret);
     }
 
     /**
