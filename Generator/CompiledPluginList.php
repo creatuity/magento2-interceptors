@@ -1,8 +1,5 @@
 <?php
-/**
- * Copyright © Magento, Inc. All rights reserved.
- * See COPYING.txt for license details.
- */
+
 namespace Creatuity\Interception\Generator;
 
 use Magento\Framework\App\ObjectManager;
@@ -10,6 +7,7 @@ use Magento\Framework\Config\ReaderInterface;
 use Magento\Framework\Config\ScopeInterface;
 use Magento\Framework\Interception\PluginList\PluginList;
 use Magento\Framework\Interception\ObjectManager\ConfigInterface;
+use Magento\Framework\Interception\PluginListGenerator;
 use Magento\Framework\ObjectManager\Config\Reader\Dom;
 use Magento\Framework\ObjectManager\Relations\Runtime as ObjectManagerRelationsRuntime;
 use Magento\Framework\Interception\Definition\Runtime as InterceptionDefinitionRuntime;
@@ -87,5 +85,26 @@ class CompiledPluginList extends PluginList
     public function setScope(ScopeInterface $scope)
     {
         $this->_configScope = $scope;
+    }
+
+    /**
+     * @inheridoc
+     */
+    protected function _loadScopedData()
+    {
+        //this makes plugin work with Magento 2.4.1 as it uses separate PluginListGenerator class with its own scopeConfig
+        $closure = function ($scope) {
+            $previousScope = $this->scopeConfig->getCurrentScope();
+            $this->scopeConfig->setCurrentScope($scope);
+            return $previousScope;
+        };
+        if (class_exists(PluginListGenerator::class)) {
+            $pluginListGenerator = $this->_objectManager->get(PluginListGenerator::class);
+            $previousScope = $closure->call($pluginListGenerator, $this->_configScope->getCurrentScope());
+            parent::_loadScopedData();
+            $closure->call($pluginListGenerator, $previousScope);
+        } else {
+            parent::_loadScopedData();
+        }
     }
 }
