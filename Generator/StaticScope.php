@@ -1,8 +1,5 @@
 <?php
-/**
- * Copyright © Magento, Inc. All rights reserved.
- * See COPYING.txt for license details.
- */
+
 namespace Creatuity\Interception\Generator;
 
 use Magento\Framework\Config\ScopeInterface;

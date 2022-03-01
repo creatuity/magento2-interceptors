@@ -1,17 +1,28 @@
 <?php
-/**
- * Copyright © Magento, Inc. All rights reserved.
- * See COPYING.txt for license details.
- */
+
 namespace Creatuity\Interception\Generator;
 
 use Magento\Setup\Module\Di\Compiler\Config\Chain\InterceptorSubstitution;
+use Magento\Setup\Module\Di\Compiler\Config\ModificationInterface;
 
 /**
  * Class CompiledInterceptorSubstitution adds required parameters to interceptor constructor
  */
-class CompiledInterceptorSubstitution extends InterceptorSubstitution
+class CompiledInterceptorSubstitution implements ModificationInterface
 {
+    /**
+     * @var InterceptorSubstitution
+     */
+    private $interceptorSubstitution;
+
+    /**
+     * @param InterceptorSubstitution $interceptorSubstitution
+     */
+    public function __construct(InterceptorSubstitution $interceptorSubstitution)
+    {
+        $this->interceptorSubstitution = $interceptorSubstitution;
+    }
+
     /**
      * Modifies input config
      *
@@ -20,7 +31,7 @@ class CompiledInterceptorSubstitution extends InterceptorSubstitution
      */
     public function modify(array $config)
     {
-        $config = parent::modify($config);
+        $config = $this->interceptorSubstitution->modify($config);
         foreach ($config['arguments'] as $instanceName => &$arguments) {
             $finalInstance = isset($config['instanceTypes'][$instanceName]) ? $config['instanceTypes'][$instanceName] : $instanceName;
             if (substr($finalInstance, -12) === '\Interceptor') {
@@ -36,6 +47,7 @@ class CompiledInterceptorSubstitution extends InterceptorSubstitution
 
             }
         }
+
         return $config;
     }
 }
