@@ -1,18 +1,14 @@
 <?php
-/**
- * Copyright © Magento, Inc. All rights reserved.
- * See COPYING.txt for license details.
- */
+
 namespace Creatuity\Interception\Generator;
 
 use Magento\Setup\Module\Di\Compiler\Config\Chain\InterceptorSubstitution;
-use Magento\Setup\Module\Di\Compiler\Config\Chain\InterceptorSubstitutionInterface;
 use Magento\Setup\Module\Di\Compiler\Config\ModificationInterface;
 
 /**
  * Class CompiledInterceptorSubstitution adds required parameters to interceptor constructor
  */
-class CompiledInterceptorSubstitution implements InterceptorSubstitutionInterface, ModificationInterface
+class CompiledInterceptorSubstitution implements ModificationInterface
 {
     /**
      * @var InterceptorSubstitution
