@@ -36,9 +36,9 @@ class CompiledInterceptorSubstitution implements InterceptorSubstitutionInterfac
     public function modify(array $config)
     {
         $config = $this->interceptorSubstitution->modify($config);
-
         foreach ($config['arguments'] as $instanceName => &$arguments) {
-            if (substr($instanceName, -12) === '\Interceptor') {
+            $finalInstance = isset($config['instanceTypes'][$instanceName]) ? $config['instanceTypes'][$instanceName] : $instanceName;
+            if (substr($finalInstance, -12) === '\Interceptor') {
                 foreach (CompiledInterceptor::propertiesToInjectToConstructor() as  $type => $name) {
                     $preference = isset($config['preferences'][$type]) ? $config['preferences'][$type] : $type;
                     foreach ($arguments as $argument) {

@@ -155,6 +155,7 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
                 ];
             }
             $this->classMethods[] = $this->_getDefaultConstructorDefinition();
+            $this->overrideMagicMethods($this->getSourceClassReflection());
             $this->overrideMethodsAndGeneratePluginGetters($this->getSourceClassReflection());
         }
     }
@@ -196,6 +197,22 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
     {
         return !($method->isConstructor() || $method->isFinal() || $method->isStatic() || $method->isDestructor()) &&
             !in_array($method->getName(), ['__sleep', '__wakeup', '__clone']);
+    }
+
+    /**
+     * Generate compiled magic methods (if needed)
+     *
+     * @param \ReflectionClass $reflection
+     * @return void
+     */
+    protected function overrideMagicMethods(\ReflectionClass $reflection)
+    {
+        if ($reflection->hasMethod('__sleep')) {
+            $this->classMethods[] = $this->compileSleep($reflection->getMethod('__sleep'));
+        }
+        if ($reflection->hasMethod('__wakeup')) {
+            $this->classMethods[] = $this->compileWakeup($reflection->getMethod('__wakeup'));
+        }
     }
 
     /**
@@ -291,6 +308,61 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
     }
 
     /**
+     * Generate source of magic method __sleep
+     *
+     * @param \ReflectionMethod $parentSleepMethod
+     * @return array
+     */
+    private function compileSleep(\ReflectionMethod $parentSleepMethod)
+    {
+        $body = [
+            '$properties = parent::__sleep();',
+            'return array_diff(',
+            "\t" . '$properties,',
+            "\t" . '[',
+        ];
+
+        foreach (static::propertiesToInjectToConstructor() as $name) {
+            $body[] = "\t\t'$name',";
+        }
+
+        $body[] = "\t" . ']';
+        $body[] = ');';
+
+        return [
+            'name' => '__sleep',
+            'parameters' => [],
+            'body' => implode("\n", $body),
+            'docblock' => ['shortDescription' => '{@inheritdoc}'],
+        ];
+    }
+
+    /**
+     * Generate source of magic method __wakeup
+     *
+     * @param \ReflectionMethod $parentSleepMethod
+     * @return array
+     */
+    private function compileWakeup(\ReflectionMethod $parentSleepMethod)
+    {
+        $body = [
+            'parent::__wakeup();',
+            '$objectManager = \Magento\Framework\App\ObjectManager::getInstance();',
+        ];
+
+        foreach (static::propertiesToInjectToConstructor() as $type => $name) {
+            $body[] = '$this->' . $name . ' = $objectManager->get(\\' . $type . '::class);';
+        }
+
+        return [
+            'name' => '__wakeup',
+            'parameters' => [],
+            'body' => implode("\n", $body),
+            'docblock' => ['shortDescription' => '{@inheritdoc}'],
+        ];
+    }
+
+    /**
      * Generate source of before plugins
      *
      * @param array $plugins
@@ -303,11 +375,11 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
     {
         $lines = [];
         foreach ($plugins as $plugin) {
-            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this$extraParams);";
+            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ...array_values(\$arguments));";
 
             if (!empty($parametersList)) {
                 $lines[] = "\$beforeResult = " . $call;
-                $lines[] = "if (\$beforeResult !== null) list({$parametersList}) = (array)\$beforeResult;";
+                $lines[] = "if (\$beforeResult !== null) \$arguments = (array)\$beforeResult;";
             } else {
                 $lines[] = $call;
             }
@@ -331,12 +403,12 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
     {
         $lines = [];
         $lines[] = "\$this->{$this->getGetterName($plugin)}()->around$capitalizedName" .
-            "(\$this, function({$this->getParameterListForNextCallback($parameters)}){";
+            "(\$this, function(...\$arguments){";
         $this->addCodeSubBlock(
             $lines,
             $this->getMethodSourceFromConfig($methodName, $plugin['next'] ?: [], $parameters, $returnVoid)
         );
-        $lines[] = "}$extraParams);";
+        $lines[] = "}, ...array_values(\$arguments));";
         return $lines;
     }
 
@@ -356,9 +428,9 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
             $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ";
 
             if (!$returnVoid) {
-                $lines[] = ["((\$tmp = $call\$result$extraParams)) !== null) ? \$tmp : \$result;"];
+                $lines[] = ["((\$tmp = $call\$result, ...array_values(\$arguments))) !== null) ? \$tmp : \$result;"];
             } else {
-                $lines[] = ["{$call}null$extraParams);"];
+                $lines[] = ["{$call}null, ...array_values(\$arguments));"];
             }
         }
         return $lines;
@@ -389,6 +461,7 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
         } else {
             $body = [];
         }
+        array_unshift($body, '$arguments = func_get_args();');
 
         $resultChain = [];
         if (isset($conf[DefinitionInterface::LISTENER_AROUND])) {
@@ -401,7 +474,7 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
                 $returnVoid
             );
         } else {
-            $resultChain[] = ["parent::{$methodName}({$this->getParameterList($parameters)});"];
+            $resultChain[] = ["parent::{$methodName}(...array_values(\$arguments));"];
         }
 
         if (isset($conf[DefinitionInterface::LISTENER_AFTER])) {
@@ -443,28 +516,6 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
             }
         }
         return $lines;
-    }
-
-    /**
-     * Get parameters definition for next callback
-     *
-     * @param array $parameters
-     * @return string
-     */
-    private function getParameterListForNextCallback(array $parameters)
-    {
-        $ret = [];
-        foreach ($parameters as $parameter) {
-            $ret [] =
-                ($parameter->isPassedByReference() ? '&' : '') .
-                "\${$parameter->getName()}" .
-                ($parameter->isDefaultValueAvailable() ?
-                    ' = ' . ($parameter->isDefaultValueConstant() ?
-                        $parameter->getDefaultValueConstantName() :
-                        str_replace("\n", '', var_export($parameter->getDefaultValue(), true))) :
-                    '');
-        }
-        return implode(', ', $ret);
     }
 
     /**
@@ -531,7 +582,6 @@ class CompiledInterceptor extends EntityAbstract implements InterceptorInterface
             'visibility' => 'private',
             'parameters' => [],
             'body' => implode("\n", $body),
-            'returnType' => $plugin['class'],
             'docblock' => [
                 'shortDescription' => 'plugin "' . $plugin['code'] . '"' . "\n" . '@return \\' . $plugin['class']
             ],
