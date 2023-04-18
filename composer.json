@@ -8,6 +8,7 @@
       "homepage": "http://creatuity.com/"
     }
   ],
+  "license": "MIT",
   "autoload": {
     "files": ["registration.php"],
     "psr-4": {
