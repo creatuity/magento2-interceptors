@@ -593,7 +593,7 @@ class CompiledInterceptor extends EntityAbstract
     private function getCompiledMethodInfo(\ReflectionMethod $method, $config)
     {
         $parameters = $method->getParameters();
-        $returnsVoid = ($method->hasReturnType() && $method->getReturnType()->getName() == 'void');
+        $returnsVoid = ($method->hasReturnType() && $method->getReturnType() instanceof \ReflectionNamedType && $method->getReturnType()->getName() == 'void');
 
         $cases = $this->getScopeCasesFromConfig($config);
 
@@ -619,16 +619,54 @@ class CompiledInterceptor extends EntityAbstract
             $body[] = "}";
         }
 
+        $returnTypeValue = null;
         $returnType = $method->getReturnType();
-        $returnTypeValue = $returnType
-            ? ($returnType->allowsNull() ? '?' : '') . $returnType->getName()
-            : null;
-        if ($returnTypeValue === 'self') {
-            $returnTypeValue = $method->getDeclaringClass()->getName();
+        $isUnionReturnType = ($method->hasReturnType() && $method->getReturnType() instanceof \ReflectionUnionType);
+        if ($isUnionReturnType) {
+            foreach ($method->getReturnType()->getTypes() as $methodReturnTypesItem) {
+                $methodReturnTypeValue = $methodReturnTypesItem
+                    ? ($methodReturnTypesItem->getName() !== 'null' && $methodReturnTypesItem->allowsNull() ? '?' : '') . $methodReturnTypesItem->getName()
+                    : null;
+                if ($methodReturnTypeValue === 'self') {
+                    $methodReturnTypeValue = $methodReturnTypesItem->getDeclaringClass()->getName();
+                }
+                if (!$returnTypeValue) {
+                    $returnTypeValue = $methodReturnTypeValue;
+                } else {
+                    $returnTypeValue .= '|' . $methodReturnTypeValue;
+                }
+            }
         }
+        
+        $isIntersectionType = ($method->hasReturnType() && $method->getReturnType() instanceof \ReflectionIntersectionType);
+        if ($isIntersectionType) {
+            foreach ($method->getReturnType()->getTypes() as $methodReturnTypesItem) {
+                $methodReturnTypeValue = $methodReturnTypesItem
+                    ? ($methodReturnTypesItem->getName() !== 'null' && $methodReturnTypesItem->allowsNull() ? '?' : '') . $methodReturnTypesItem->getName()
+                    : null;
+                if ($methodReturnTypeValue === 'self') {
+                    $methodReturnTypeValue = $methodReturnTypesItem->getDeclaringClass()->getName();
+                }
+                if (!$returnTypeValue) {
+                    $returnTypeValue = $methodReturnTypeValue;
+                } else {
+                    $returnTypeValue .= '&' . $methodReturnTypeValue;
+                }
+            }
+        }
+        
+        if (!$returnTypeValue) {
+            $returnTypeValue = $returnType
+                ? ($returnType->allowsNull() ? '?' : '') . $returnType->getName()
+                : null;
+            if ($returnTypeValue === 'self') {
+                $returnTypeValue = $method->getDeclaringClass()->getName();
+            }
+        }
+
         return [
             'name' => ($method->returnsReference() ? '& ' : '') . $method->getName(),
-            'parameters' =>array_map([$this, '_getMethodParameterInfo'], $parameters),
+            'parameters' => array_map([$this, '_getMethodParameterInfo'], $parameters),
             'body' => implode("\n", $body),
             'returnType' => $returnTypeValue,
             'docblock' => ['shortDescription' => '{@inheritdoc}'],
