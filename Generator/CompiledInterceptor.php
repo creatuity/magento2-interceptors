@@ -36,6 +36,13 @@ class CompiledInterceptor extends EntityAbstract
     private $areasPlugins;
 
     /**
+     * Intercepted methods list
+     *
+     * @var array
+     */
+    private $interceptedMethods = [];
+
+    /**
      * CompiledInterceptor constructor.
      * @param AreasPluginList $areasPlugins
      * @param null|string $sourceClassName
@@ -69,7 +76,7 @@ class CompiledInterceptor extends EntityAbstract
      */
     public function setInterceptedMethods($interceptedMethods)
     {
-        //this is not used as methods are read from reflaction
+        //this is not used as methods are read from reflection
         $this->interceptedMethods = $interceptedMethods;
     }
 
