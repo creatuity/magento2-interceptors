@@ -669,6 +669,9 @@ class CompiledInterceptor extends EntityAbstract
             if ($returnTypeValue === 'self') {
                 $returnTypeValue = $method->getDeclaringClass()->getName();
             }
+            if ($returnType && $returnType->getName() === 'mixed') {
+                $returnTypeValue = 'mixed';
+            }
         }
 
         return [
