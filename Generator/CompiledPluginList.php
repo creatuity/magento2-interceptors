@@ -5,13 +5,15 @@ namespace Creatuity\Interception\Generator;
 use Magento\Framework\App\ObjectManager;
 use Magento\Framework\Config\ReaderInterface;
 use Magento\Framework\Config\ScopeInterface;
-use Magento\Framework\Interception\PluginList\PluginList;
+use Magento\Framework\Interception\Definition\Runtime as InterceptionDefinitionRuntime;
 use Magento\Framework\Interception\ObjectManager\ConfigInterface;
+use Magento\Framework\Interception\PluginList\PluginList;
 use Magento\Framework\Interception\PluginListGenerator;
 use Magento\Framework\ObjectManager\Config\Reader\Dom;
-use Magento\Framework\ObjectManager\Relations\Runtime as ObjectManagerRelationsRuntime;
-use Magento\Framework\Interception\Definition\Runtime as InterceptionDefinitionRuntime;
 use Magento\Framework\ObjectManager\Definition\Runtime as ObjectManagerDefinitionRuntime;
+use Magento\Framework\ObjectManager\Relations\Runtime as ObjectManagerRelationsRuntime;
+
+use function class_exists;
 
 /**
  * Class CompiledPluginList
