@@ -8,6 +8,20 @@ namespace Creatuity\Interception\Generator;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Config\CacheInterface;
 
+use function dirname;
+use function file_exists;
+use function file_put_contents;
+use function glob;
+use function is_dir;
+use function is_file;
+use function mkdir;
+use function str_replace;
+use function unlink;
+use function var_export;
+
+use const BP;
+use const DIRECTORY_SEPARATOR;
+
 /**
  * Class FileCache
  */

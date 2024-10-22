@@ -11,6 +11,26 @@ use Magento\Framework\Config\ScopeInterface;
 use Magento\Framework\Interception\DefinitionInterface;
 use Magento\Setup\Module\Di\App\Task\Operation\Area;
 
+use ReflectionClass;
+use ReflectionException;
+use ReflectionIntersectionType;
+use ReflectionMethod;
+use ReflectionNamedType;
+use ReflectionUnionType;
+
+use function array_combine;
+use function array_map;
+use function array_merge;
+use function array_unshift;
+use function count;
+use function implode;
+use function in_array;
+use function ltrim;
+use function str_repeat;
+use function strrchr;
+use function substr;
+use function ucfirst;
+
 /**
  * Compiled interceptors generator, please see ../README.md for details
  */
@@ -26,7 +46,7 @@ class CompiledInterceptor extends EntityAbstract
     private $classProperties;
 
     /**
-     * @var \ReflectionClass
+     * @var ReflectionClass
      */
     private $baseReflection;
 
@@ -84,7 +104,7 @@ class CompiledInterceptor extends EntityAbstract
      * Get all class methods
      *
      * @return array|null
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     protected function _getClassMethods()
     {
@@ -96,7 +116,7 @@ class CompiledInterceptor extends EntityAbstract
      * Get all class properties
      *
      * @return array|null
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     protected function _getClassProperties()
     {
@@ -108,7 +128,7 @@ class CompiledInterceptor extends EntityAbstract
      * Get default constructor definition for generated class
      *
      * @return array
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     protected function _getDefaultConstructorDefinition()
     {
@@ -122,7 +142,7 @@ class CompiledInterceptor extends EntityAbstract
      * Generate class source
      *
      * @return bool|string
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     protected function _generateCode()
     {
@@ -138,7 +158,7 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Generate all methods and properties
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     private function generateMethodsAndProperties()
     {
@@ -178,13 +198,13 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Get reflection of source class
      *
-     * @return \ReflectionClass
-     * @throws \ReflectionException
+     * @return ReflectionClass
+     * @throws ReflectionException
      */
     private function getSourceClassReflection()
     {
         if ($this->baseReflection === null) {
-            $this->baseReflection = new \ReflectionClass($this->getSourceClassName());
+            $this->baseReflection = new ReflectionClass($this->getSourceClassName());
         }
         return $this->baseReflection;
     }
@@ -192,10 +212,10 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Whether method is intercepted
      *
-     * @param \ReflectionMethod $method
+     * @param ReflectionMethod $method
      * @return bool
      */
-    protected function isInterceptedMethod(\ReflectionMethod $method)
+    protected function isInterceptedMethod(ReflectionMethod $method)
     {
         return !($method->isConstructor() || $method->isFinal() || $method->isStatic() || $method->isDestructor()) &&
             !in_array($method->getName(), ['__sleep', '__wakeup', '__clone']);
@@ -204,10 +224,10 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Generate compiled magic methods (if needed)
      *
-     * @param \ReflectionClass $reflection
+     * @param ReflectionClass $reflection
      * @return void
      */
-    protected function overrideMagicMethods(\ReflectionClass $reflection)
+    protected function overrideMagicMethods(ReflectionClass $reflection)
     {
         if ($reflection->hasMethod('__sleep')) {
             $this->classMethods[] = $this->compileSleep($reflection->getMethod('__sleep'));
@@ -220,11 +240,11 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Generate compiled methods and plugin getters
      *
-     * @param \ReflectionClass $reflection
+     * @param ReflectionClass $reflection
      */
-    private function overrideMethodsAndGeneratePluginGetters(\ReflectionClass $reflection)
+    private function overrideMethodsAndGeneratePluginGetters(ReflectionClass $reflection)
     {
-        $publicMethods = $reflection->getMethods(\ReflectionMethod::IS_PUBLIC);
+        $publicMethods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
 
         $allPlugins = [];
         foreach ($publicMethods as $method) {
@@ -246,11 +266,11 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Generate class constructor adding required properties when types are not present in parent constructor
      *
-     * @param \ReflectionMethod|null $parentConstructor
+     * @param ReflectionMethod|null $parentConstructor
      * @param array $properties
      * @return array
      */
-    private function injectPropertiesSettersToConstructor(\ReflectionMethod $parentConstructor = null, $properties = [])
+    private function injectPropertiesSettersToConstructor(ReflectionMethod $parentConstructor = null, $properties = [])
     {
         if ($parentConstructor == null) {
             $parameters = [];
@@ -312,14 +332,14 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Generate source of magic method __sleep
      *
-     * @param \ReflectionMethod $parentSleepMethod
+     * @param ReflectionMethod $parentSleepMethod
      * @return array
      */
-    private function compileSleep(\ReflectionMethod $parentSleepMethod)
+    private function compileSleep(ReflectionMethod $parentSleepMethod)
     {
         $body = [
             '$properties = parent::__sleep();',
-            'return array_diff(',
+            'return \array_diff(',
             "\t" . '$properties,',
             "\t" . '[',
         ];
@@ -342,10 +362,10 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Generate source of magic method __wakeup
      *
-     * @param \ReflectionMethod $parentSleepMethod
+     * @param ReflectionMethod $parentSleepMethod
      * @return array
      */
-    private function compileWakeup(\ReflectionMethod $parentSleepMethod)
+    private function compileWakeup(ReflectionMethod $parentSleepMethod)
     {
         $body = [
             'parent::__wakeup();',
@@ -377,7 +397,7 @@ class CompiledInterceptor extends EntityAbstract
     {
         $lines = [];
         foreach ($plugins as $plugin) {
-            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ...array_values(\$arguments));";
+            $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ...\array_values(\$arguments));";
 
             if (!empty($parametersList)) {
                 $lines[] = "\$beforeResult = " . $call;
@@ -410,7 +430,7 @@ class CompiledInterceptor extends EntityAbstract
             $lines,
             $this->getMethodSourceFromConfig($methodName, $plugin['next'] ?: [], $parameters, $returnVoid)
         );
-        $lines[] = "}, ...array_values(\$arguments));";
+        $lines[] = "}, ...\array_values(\$arguments));";
         return $lines;
     }
 
@@ -430,9 +450,9 @@ class CompiledInterceptor extends EntityAbstract
             $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ";
 
             if (!$returnVoid) {
-                $lines[] = ["((\$tmp = $call\$result, ...array_values(\$arguments))) !== null) ? \$tmp : \$result;"];
+                $lines[] = ["((\$tmp = $call\$result, ...\array_values(\$arguments))) !== null) ? \$tmp : \$result;"];
             } else {
-                $lines[] = ["{$call}null, ...array_values(\$arguments));"];
+                $lines[] = ["{$call}null, ...\array_values(\$arguments));"];
             }
         }
         return $lines;
@@ -463,7 +483,7 @@ class CompiledInterceptor extends EntityAbstract
         } else {
             $body = [];
         }
-        array_unshift($body, '$arguments = func_get_args();');
+        array_unshift($body, '$arguments = \func_get_args();');
 
         $resultChain = [];
         if (isset($conf[DefinitionInterface::LISTENER_AROUND])) {
@@ -476,7 +496,7 @@ class CompiledInterceptor extends EntityAbstract
                 $returnVoid
             );
         } else {
-            $resultChain[] = ["parent::{$methodName}(...array_values(\$arguments));"];
+            $resultChain[] = ["parent::{$methodName}(...\array_values(\$arguments));"];
         }
 
         if (isset($conf[DefinitionInterface::LISTENER_AFTER])) {
@@ -593,14 +613,14 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Get compiled method data for code generator
      *
-     * @param \ReflectionMethod $method
+     * @param ReflectionMethod $method
      * @param array $config
      * @return array
      */
-    private function getCompiledMethodInfo(\ReflectionMethod $method, $config)
+    private function getCompiledMethodInfo(ReflectionMethod $method, $config)
     {
         $parameters = $method->getParameters();
-        $returnsVoid = ($method->hasReturnType() && $method->getReturnType() instanceof \ReflectionNamedType && $method->getReturnType()->getName() == 'void');
+        $returnsVoid = ($method->hasReturnType() && $method->getReturnType() instanceof ReflectionNamedType && $method->getReturnType()->getName() == 'void');
 
         $cases = $this->getScopeCasesFromConfig($config);
 
@@ -628,7 +648,7 @@ class CompiledInterceptor extends EntityAbstract
 
         $returnTypeValue = null;
         $returnType = $method->getReturnType();
-        $isUnionReturnType = ($method->hasReturnType() && $method->getReturnType() instanceof \ReflectionUnionType);
+        $isUnionReturnType = ($method->hasReturnType() && $method->getReturnType() instanceof ReflectionUnionType);
         if ($isUnionReturnType) {
             foreach ($method->getReturnType()->getTypes() as $methodReturnTypesItem) {
                 $methodReturnTypeValue = $methodReturnTypesItem
@@ -645,7 +665,7 @@ class CompiledInterceptor extends EntityAbstract
             }
         }
         
-        $isIntersectionType = ($method->hasReturnType() && $method->getReturnType() instanceof \ReflectionIntersectionType);
+        $isIntersectionType = ($method->hasReturnType() && $method->getReturnType() instanceof ReflectionIntersectionType);
         if ($isIntersectionType) {
             foreach ($method->getReturnType()->getTypes() as $methodReturnTypesItem) {
                 $methodReturnTypeValue = $methodReturnTypesItem
@@ -790,11 +810,11 @@ class CompiledInterceptor extends EntityAbstract
     /**
      * Generates recursive maps of plugins for given method
      *
-     * @param \ReflectionMethod $method
+     * @param ReflectionMethod $method
      * @param array $allPlugins
      * @return array
      */
-    private function getPluginsConfig(\ReflectionMethod $method, &$allPlugins)
+    private function getPluginsConfig(ReflectionMethod $method, &$allPlugins)
     {
         $className = ltrim($this->getSourceClassName(), '\\');
 

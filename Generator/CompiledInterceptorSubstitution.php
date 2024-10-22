@@ -4,6 +4,9 @@ namespace Creatuity\Interception\Generator;
 
 use Magento\Setup\Module\Di\Compiler\Config\Chain\InterceptorSubstitution;
 
+use function array_merge;
+use function substr;
+
 /**
  * Class CompiledInterceptorSubstitution adds required parameters to interceptor constructor
  */
