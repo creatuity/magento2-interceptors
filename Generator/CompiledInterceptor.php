@@ -712,6 +712,18 @@ class CompiledInterceptor extends EntityAbstract
     private function getScopeCasesFromConfig($config)
     {
         $cases = [];
+
+        //if global scope is enabled, check for any disabled scopes to exclude
+        if (array_key_exists('global', $config)) {
+            $disabledScopes = array_diff_key(
+                $this->areasPlugins->getPluginsConfigForAllAreas(),
+                $config
+            );
+            foreach ($disabledScopes as $scope => $conf) {
+                $config[] = [$scope => []];
+            }
+        }
+
         //group cases by config
         foreach ($config as $scope => $conf) {
             $caseStr = "\tcase '$scope':";
