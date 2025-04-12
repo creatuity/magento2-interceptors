@@ -720,7 +720,7 @@ class CompiledInterceptor extends EntityAbstract
                 $config
             );
             foreach ($disabledScopes as $scope => $conf) {
-                $config[] = [$scope => []];
+                $config[$scope] = [];
             }
         }
 
