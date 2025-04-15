@@ -31,8 +31,8 @@ class CompiledPluginList extends PluginList
     public function __construct(
         ObjectManager $objectManager,
         ScopeInterface $scope,
-        ReaderInterface $reader = null,
-        ConfigInterface $omConfig = null,
+        ?ReaderInterface $reader = null,
+        ?ConfigInterface $omConfig = null,
         $cachePath = null
     ) {
         if (!$reader || !$omConfig) {
