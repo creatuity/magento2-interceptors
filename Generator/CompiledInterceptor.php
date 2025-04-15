@@ -75,9 +75,9 @@ class CompiledInterceptor extends EntityAbstract
         AreasPluginList $areasPlugins,
         $sourceClassName = null,
         $resultClassName = null,
-        Io $ioObject = null,
-        CodeGeneratorInterface $classGenerator = null,
-        DefinedClasses $definedClasses = null
+        ?Io $ioObject = null,
+        ?CodeGeneratorInterface $classGenerator = null,
+        ?DefinedClasses $definedClasses = null
     ) {
         parent::__construct(
             $sourceClassName,
@@ -270,8 +270,10 @@ class CompiledInterceptor extends EntityAbstract
      * @param array $properties
      * @return array
      */
-    private function injectPropertiesSettersToConstructor(ReflectionMethod $parentConstructor = null, $properties = [])
-    {
+    private function injectPropertiesSettersToConstructor(
+        ?ReflectionMethod $parentConstructor = null,
+        $properties = []
+    ) {
         if ($parentConstructor == null) {
             $parameters = [];
             $body = [];
