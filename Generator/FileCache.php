@@ -39,6 +39,7 @@ class FileCache implements CacheInterface
         if ($cachePath === null) {
             $this->cachePath = BP . DIRECTORY_SEPARATOR .
                 DirectoryList::GENERATED . DIRECTORY_SEPARATOR .
+                DirectoryList::GENERATED_METADATA . DIRECTORY_SEPARATOR .
                 'staticcache';
         } else {
             $this->cachePath = $cachePath;
