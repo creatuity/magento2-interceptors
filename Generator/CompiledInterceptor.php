@@ -452,7 +452,7 @@ class CompiledInterceptor extends EntityAbstract
             $call = "\$this->" . $this->getGetterName($plugin) . "()->$methodName(\$this, ";
 
             if (!$returnVoid) {
-                $lines[] = ["((\$tmp = $call\$result, ...\array_values(\$arguments))) !== null) ? \$tmp : \$result;"];
+                $lines[] = ["{$call}\$result, ...\array_values(\$arguments));"];
             } else {
                 $lines[] = ["{$call}null, ...\array_values(\$arguments));"];
             }
