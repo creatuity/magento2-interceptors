@@ -40,8 +40,14 @@ class AreasPluginList
             $this->plugins = [];
             //this is to emulate order M2 is reading scopes config to use scope cache
             //"global|primary" should be loaded first and then "global|primary|frontend" etc.
+            //Always include the "primary" and "global" scopes (regardless of what
+            //Scope::getAllScopes() returns on a given Magento version) so that plugins
+            //declared in the global etc/di.xml are represented for the default/CLI branch
+            //of the generated interceptor and not only in the area specific branches.
+            //See https://github.com/creatuity/magento2-interceptors/issues/28
+            $scopes = array_values(array_unique(array_merge(['primary', 'global'], $this->scope->getAllScopes())));
             $defaultScopePluginList = $defaultScope = null;
-            foreach ($this->scope->getAllScopes() as $scope) {
+            foreach ($scopes as $scope) {
                 if ($defaultScopePluginList === null) {
                     $defaultScopePluginList = new CompiledPluginList(
                         ObjectManager::getInstance(),
