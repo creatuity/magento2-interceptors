@@ -713,9 +713,33 @@ class CompiledInterceptor extends EntityAbstract
      */
     private function getScopeCasesFromConfig($config)
     {
+        //The global scope is Magento's base configuration: it applies to CLI/primary and to
+        //every scope not explicitly enumerated here. Its plugin chain must therefore drive the
+        //switch `default` branch so global plugins fire everywhere, exactly like a standard
+        //Magento interceptor (whose PluginList merges global config into every area). Falling
+        //through to a parent-direct default would silently skip global plugins in CLI and in
+        //any non-enumerated scope (crontab, webapi_rest, webapi_soap, graphql).
+        //See https://github.com/creatuity/magento2-interceptors/issues/28
+        //Fall back to primary, then the last scope, when the global scope is not available.
+        $defaultScope = null;
+        foreach (['global', 'primary'] as $candidate) {
+            if (array_key_exists($candidate, $config)) {
+                $defaultScope = $candidate;
+                break;
+            }
+        }
+        if ($defaultScope === null) {
+            $defaultScope = array_key_last($config);
+        }
+        $defaultConf = $config[$defaultScope];
+
         $cases = [];
-        //group cases by config
+        //emit an explicit `case` only for scopes whose merged chain differs from the default
+        //(global) one; scopes equal to global collapse into the default branch
         foreach ($config as $scope => $conf) {
+            if ($conf == $defaultConf) {
+                continue;
+            }
             $caseStr = "\tcase '$scope':";
             foreach ($cases as &$case) {
                 if ($case['conf'] == $conf) {
@@ -723,9 +747,11 @@ class CompiledInterceptor extends EntityAbstract
                     continue 2;
                 }
             }
-            $cases[] = ['cases'=>[$caseStr], 'conf'=>$conf];
+            unset($case);
+            $cases[] = ['cases' => [$caseStr], 'conf' => $conf];
         }
-        $cases[count($cases) - 1]['cases'] = ["\tdefault:"];
+        //the default branch always carries the global/default chain
+        $cases[] = ['cases' => ["\tdefault:"], 'conf' => $defaultConf];
         return $cases;
     }
 
@@ -821,18 +847,15 @@ class CompiledInterceptor extends EntityAbstract
         $className = ltrim($this->getSourceClassName(), '\\');
 
         $result = [];
-        $hasEmptyScopes = false;
         foreach ($this->areasPlugins->getPluginsConfigForAllAreas() as $scope => $pluginsList) {
-            $pluginChain = $this->getPluginsChain($pluginsList, $className, $method->getName(), $allPlugins);
-            if ($pluginChain) {
-                $result[$scope] = $pluginChain;
-            } else {
-                $hasEmptyScopes = true;
-            }
+            //keep every scope (including ones that resolve to no plugins) so the global scope
+            //is always present to drive the switch default branch; scopes without their own
+            //plugins collapse into that default automatically in getScopeCasesFromConfig()
+            $result[$scope] = $this->getPluginsChain($pluginsList, $className, $method->getName(), $allPlugins) ?: [];
         }
-        //if plugins are not empty and there are scopes with no plugins make sure default/empty case will be handled
-        if (!empty($result) && $hasEmptyScopes) {
-            $result['_empty'] = [];
+        //no plugins in any scope -> the method does not need to be intercepted at all
+        if (!array_filter($result)) {
+            return [];
         }
         return $result;
     }
