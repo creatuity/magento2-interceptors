@@ -9,6 +9,7 @@ use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Code\Generator\EntityAbstract;
 use Magento\Framework\Config\ScopeInterface;
 use Magento\Framework\Interception\DefinitionInterface;
+use Magento\Framework\Interception\InterceptorInterface;
 use Magento\Setup\Module\Di\App\Task\Operation\Area;
 
 use ReflectionClass;
@@ -151,6 +152,7 @@ class CompiledInterceptor extends EntityAbstract
         } else {
             $this->_classGenerator->setExtendedClass($this->getSourceClassName());
         }
+        $this->_classGenerator->setImplementedInterfaces(['\\' . InterceptorInterface::class]);
         $this->generateMethodsAndProperties();
         return parent::_generateCode();
     }
@@ -177,6 +179,7 @@ class CompiledInterceptor extends EntityAbstract
                 ];
             }
             $this->classMethods[] = $this->_getDefaultConstructorDefinition();
+            $this->classMethods[] = $this->getCallParentMethodInfo();
             $this->overrideMagicMethods($this->getSourceClassReflection());
             $this->overrideMethodsAndGeneratePluginGetters($this->getSourceClassReflection());
         }
@@ -358,6 +361,31 @@ class CompiledInterceptor extends EntityAbstract
             'parameters' => [],
             'body' => implode("\n", $body),
             'docblock' => ['shortDescription' => '{@inheritdoc}'],
+        ];
+    }
+
+    /**
+     * Generate InterceptorInterface::___callParent() so callers can bypass plugins like with Magento interceptors
+     *
+     * @return array
+     */
+    private function getCallParentMethodInfo()
+    {
+        return [
+            'name' => '___callParent',
+            'parameters' => [
+                ['name' => 'method'],
+                ['name' => 'arguments', 'type' => 'array'],
+            ],
+            'body' => 'return parent::$method(...\\array_values($arguments));',
+            'docblock' => [
+                'shortDescription' => 'Calls parent class method',
+                'tags' => [
+                    ['name' => 'param', 'description' => 'string $method'],
+                    ['name' => 'param', 'description' => 'array $arguments'],
+                    ['name' => 'return', 'description' => 'mixed'],
+                ],
+            ],
         ];
     }
 

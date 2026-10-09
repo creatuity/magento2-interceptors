@@ -14,6 +14,7 @@ use Magento\Framework\Code\Generator\Io;
 use Creatuity\Interception\Generator\CompiledInterceptor;
 use Creatuity\Interception\Generator\CompiledPluginList;
 use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Interception\InterceptorInterface;
 use Creatuity\Interception\Test\Integration\CompiledInterceptor\Custom\Module\Model\SecondItem;
 use Creatuity\Interception\Test\Integration\CompiledInterceptor\Custom\Module\Model\ComplexItem;
 use Creatuity\Interception\Test\Integration\CompiledInterceptor\Custom\Module\Model\ComplexItemTyped;
@@ -141,6 +142,87 @@ class CompiledInterceptorTest extends \PHPUnit\Framework\TestCase
         );
         $interceptor->getName();
         */
+    }
+
+    /**
+     * Checks that generated interceptors implement InterceptorInterface like Magento interceptors do.
+     *
+     * @param string $className
+     * @param string $resultClassName
+     * @dataProvider interceptorDataProvider
+     */
+    public function testGeneratedInterceptorImplementsInterceptorInterface($className, $resultClassName)
+    {
+        $interceptor = $this->createGeneratedInterceptor($className, $resultClassName);
+
+        $this->assertInstanceOf(InterceptorInterface::class, $interceptor);
+        $this->assertInstanceOf($className, $interceptor);
+        $this->assertTrue((new \ReflectionClass($interceptor))->implementsInterface(InterceptorInterface::class));
+    }
+
+    /**
+     * Checks that ___callParent() calls the original method without running any plugins.
+     */
+    public function testCallParentBypassesPlugins()
+    {
+        /** @var ComplexItem|InterceptorInterface $interceptor */
+        $interceptor = $this->createGeneratedInterceptor(ComplexItem::class, ComplexItem::class . '\Interceptor');
+
+        $this->assertNull($interceptor->___callParent('setValue', ['value' => 'original']));
+        $this->assertEquals('original', $interceptor->___callParent('getName', []));
+
+        $interceptor->___callParent('secondVariadicParameter', ['first', 'second', 'third']);
+        $this->assertEquals('first', $interceptor->___callParent('getName', []));
+
+        $this->assertSame($interceptor, $interceptor->___callParent('returnsSelf', []));
+
+        $this->expectException(\Error::class);
+        $interceptor->getName();
+    }
+
+    /**
+     * Generates, loads and instantiates an interceptor whose plugins cannot be resolved, so any plugin call fails.
+     *
+     * @param string $className
+     * @param string $resultClassName
+     * @return object
+     */
+    private function createGeneratedInterceptor($className, $resultClassName)
+    {
+        if (!class_exists($resultClassName, false)) {
+            $objectManagerHelper = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
+            /** @var AreasPluginList $areaPlugins */
+            $areaPlugins = $objectManagerHelper->getObject(
+                AreasPluginList::class,
+                [
+                    'areaList' => $this->areaList,
+                    'plugins' => $this->createScopeReaders()
+                ]
+            );
+
+            /** @var CompiledInterceptor|MockObject $interceptor */
+            $interceptor = $this->getMockBuilder(CompiledInterceptor::class)
+                ->setMethods(['_validateData'])
+                ->setConstructorArgs([$areaPlugins, $className, $resultClassName, $this->ioGenerator, null, null])
+                ->getMock();
+            $interceptor->method('_validateData')->willReturn(true);
+
+            $code = null;
+            $this->ioGenerator->method('generateResultFileName')->willReturn('Interceptor.php');
+            $this->ioGenerator->method('writeResultFile')->willReturnCallback(
+                function ($fileName, $content) use (&$code) {
+                    $code = $content;
+                }
+            );
+
+            $this->assertEquals('Interceptor.php', $interceptor->generate(), implode(', ', $interceptor->getErrors()));
+            eval($code);
+        }
+
+        return new $resultClassName(
+            $this->createMock(\Magento\Framework\ObjectManagerInterface::class),
+            new StaticScope('global')
+        );
     }
 
     /**
